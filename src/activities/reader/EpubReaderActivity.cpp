@@ -746,10 +746,10 @@ void EpubReaderActivity::renderStatusBar(const int orientedMarginRight, const in
 
     // Hide percentage when progress bar is shown to reduce clutter
     if (showProgressPercentage) {
-      snprintf(progressStr, sizeof(progressStr), "%d/%d  %.0f%%", section->currentPage + 1, section->pageCount,
+      snprintf(progressStr, sizeof(progressStr), "%d/%d  %.1f%%", section->currentPage + 1, section->pageCount,
                bookProgress);
     } else if (showBookPercentage) {
-      snprintf(progressStr, sizeof(progressStr), "%.0f%%", bookProgress);
+      snprintf(progressStr, sizeof(progressStr), "%.1f%%", bookProgress);
     } else {
       snprintf(progressStr, sizeof(progressStr), "%d/%d", section->currentPage + 1, section->pageCount);
     }
