@@ -29,14 +29,15 @@ void stripSoftHyphensInPlace(std::string& word) {
 }
 
 // Returns the rendered width for a word while ignoring soft hyphen glyphs and optionally appending a visible hyphen.
-uint16_t measureWordWidth(const GfxRenderer& renderer, const int fontId, const std::string& word,
-                          const EpdFontFamily::Style style, const bool appendHyphen = false) {
+uint16_t measureWordWidth(const GfxRenderer& renderer, const int fontId, const bool kerningEnabled,
+                          const std::string& word, const EpdFontFamily::Style style,
+                          const bool appendHyphen = false) {
   if (word.size() == 1 && word[0] == ' ' && !appendHyphen) {
     return renderer.getSpaceWidth(fontId);
   }
   const bool hasSoftHyphen = containsSoftHyphen(word);
   if (!hasSoftHyphen && !appendHyphen) {
-    return renderer.getTextWidth(fontId, word.c_str(), style);
+    return renderer.getTextWidth(fontId, word.c_str(), style, kerningEnabled);
   }
 
   std::string sanitized = word;
@@ -46,7 +47,7 @@ uint16_t measureWordWidth(const GfxRenderer& renderer, const int fontId, const s
   if (appendHyphen) {
     sanitized.push_back('-');
   }
-  return renderer.getTextWidth(fontId, sanitized.c_str(), style);
+  return renderer.getTextWidth(fontId, sanitized.c_str(), style, kerningEnabled);
 }
 
 }  // namespace
@@ -98,7 +99,7 @@ std::vector<uint16_t> ParsedText::calculateWordWidths(const GfxRenderer& rendere
   wordWidths.reserve(words.size());
 
   for (size_t i = 0; i < words.size(); ++i) {
-    wordWidths.push_back(measureWordWidth(renderer, fontId, words[i], wordStyles[i]));
+    wordWidths.push_back(measureWordWidth(renderer, fontId, kerningEnabled, words[i], wordStyles[i]));
   }
 
   return wordWidths;
@@ -329,7 +330,8 @@ bool ParsedText::hyphenateWordAtIndex(const size_t wordIndex, const int availabl
     }
 
     const bool needsHyphen = info.requiresInsertedHyphen;
-    const int prefixWidth = measureWordWidth(renderer, fontId, word.substr(0, offset), style, needsHyphen);
+    const int prefixWidth = measureWordWidth(renderer, fontId, kerningEnabled, word.substr(0, offset), style,
+                                             needsHyphen);
     if (prefixWidth > availableWidth || prefixWidth <= chosenWidth) {
       continue;  // Skip if too wide or not an improvement
     }
@@ -363,7 +365,7 @@ bool ParsedText::hyphenateWordAtIndex(const size_t wordIndex, const int availabl
 
   // Update cached widths to reflect the new prefix/remainder pairing.
   wordWidths[wordIndex] = static_cast<uint16_t>(chosenWidth);
-  const uint16_t remainderWidth = measureWordWidth(renderer, fontId, remainder, style);
+  const uint16_t remainderWidth = measureWordWidth(renderer, fontId, kerningEnabled, remainder, style);
   wordWidths.insert(wordWidths.begin() + wordIndex + 1, remainderWidth);
   return true;
 }

@@ -20,7 +20,7 @@ class PageElement {
   int16_t yPos;
   explicit PageElement(const int16_t xPos, const int16_t yPos) : xPos(xPos), yPos(yPos) {}
   virtual ~PageElement() = default;
-  virtual void render(GfxRenderer& renderer, int fontId, int xOffset, int yOffset) = 0;
+  virtual void render(GfxRenderer& renderer, int fontId, int xOffset, int yOffset, bool kerningEnabled) = 0;
   virtual bool serialize(FsFile& file) = 0;
   virtual PageElementTag getTag() const = 0;  // Add type identification
 };
@@ -32,7 +32,7 @@ class PageLine final : public PageElement {
  public:
   PageLine(std::shared_ptr<TextBlock> block, const int16_t xPos, const int16_t yPos)
       : PageElement(xPos, yPos), block(std::move(block)) {}
-  void render(GfxRenderer& renderer, int fontId, int xOffset, int yOffset) override;
+  void render(GfxRenderer& renderer, int fontId, int xOffset, int yOffset, bool kerningEnabled) override;
   bool serialize(FsFile& file) override;
   PageElementTag getTag() const override { return TAG_PageLine; }
   static std::unique_ptr<PageLine> deserialize(FsFile& file);
@@ -45,7 +45,7 @@ class PageImage final : public PageElement {
  public:
   PageImage(std::shared_ptr<ImageBlock> block, const int16_t xPos, const int16_t yPos)
       : PageElement(xPos, yPos), imageBlock(std::move(block)) {}
-  void render(GfxRenderer& renderer, int fontId, int xOffset, int yOffset) override;
+  void render(GfxRenderer& renderer, int fontId, int xOffset, int yOffset, bool kerningEnabled) override;
   bool serialize(FsFile& file) override;
   PageElementTag getTag() const override { return TAG_PageImage; }
   static std::unique_ptr<PageImage> deserialize(FsFile& file);
@@ -55,7 +55,7 @@ class Page {
  public:
   // the list of block index and line numbers on this page
   std::vector<std::shared_ptr<PageElement>> elements;
-  void render(GfxRenderer& renderer, int fontId, int xOffset, int yOffset) const;
+  void render(GfxRenderer& renderer, int fontId, int xOffset, int yOffset, bool kerningEnabled = true) const;
   bool serialize(FsFile& file) const;
   static std::unique_ptr<Page> deserialize(FsFile& file);
 
