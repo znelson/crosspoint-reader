@@ -112,8 +112,10 @@ void GfxRenderer::drawText(const int fontId, const int x, const int y, const cha
   }
 
   uint32_t cp;
+  uint32_t prevCp = 0;
   while ((cp = utf8NextCodepoint(reinterpret_cast<const uint8_t**>(&text)))) {
-    renderChar(font, cp, &xpos, &yPos, black, style);
+    renderChar(font, cp, &xpos, &yPos, black, style, prevCp);
+    prevCp = cp;
   }
 }
 
@@ -724,9 +726,15 @@ int GfxRenderer::getTextAdvanceX(const int fontId, const char* text) const {
   }
 
   uint32_t cp;
+  uint32_t prevCp = 0;
   int width = 0;
+  const EpdFontFamily& family = fontMap.at(fontId);
   while ((cp = utf8NextCodepoint(reinterpret_cast<const uint8_t**>(&text)))) {
-    width += fontMap.at(fontId).getGlyph(cp, EpdFontFamily::REGULAR)->advanceX;
+    if (prevCp != 0) {
+      width += family.getKerning(prevCp, cp, EpdFontFamily::REGULAR);
+    }
+    width += family.getGlyph(cp, EpdFontFamily::REGULAR)->advanceX;
+    prevCp = cp;
   }
   return width;
 }
@@ -782,6 +790,7 @@ void GfxRenderer::drawTextRotated90CW(const int fontId, const int x, const int y
   int yPos = y;  // Current Y position (decreases as we draw characters)
 
   uint32_t cp;
+  uint32_t prevCp = 0;
   while ((cp = utf8NextCodepoint(reinterpret_cast<const uint8_t**>(&text)))) {
     const EpdGlyph* glyph = font.getGlyph(cp, style);
     if (!glyph) {
@@ -789,6 +798,11 @@ void GfxRenderer::drawTextRotated90CW(const int fontId, const int x, const int y
     }
     if (!glyph) {
       continue;
+    }
+
+    // Apply kerning adjustment before rendering
+    if (prevCp != 0) {
+      yPos -= font.getKerning(prevCp, cp, style);
     }
 
     const int is2Bit = font.getData(style)->is2Bit;
@@ -837,6 +851,7 @@ void GfxRenderer::drawTextRotated90CW(const int fontId, const int x, const int y
 
     // Move to next character position (going up, so decrease Y)
     yPos -= glyph->advanceX;
+    prevCp = cp;
   }
 }
 
@@ -944,7 +959,8 @@ void GfxRenderer::cleanupGrayscaleWithFrameBuffer() const {
 }
 
 void GfxRenderer::renderChar(const EpdFontFamily& fontFamily, const uint32_t cp, int* x, const int* y,
-                             const bool pixelState, const EpdFontFamily::Style style) const {
+                             const bool pixelState, const EpdFontFamily::Style style,
+                             const uint32_t prevCp) const {
   const EpdGlyph* glyph = fontFamily.getGlyph(cp, style);
   if (!glyph) {
     glyph = fontFamily.getGlyph(REPLACEMENT_GLYPH, style);
@@ -954,6 +970,11 @@ void GfxRenderer::renderChar(const EpdFontFamily& fontFamily, const uint32_t cp,
   if (!glyph) {
     LOG_ERR("GFX", "No glyph for codepoint %d", cp);
     return;
+  }
+
+  // Apply kerning adjustment before rendering
+  if (prevCp != 0) {
+    *x += fontFamily.getKerning(prevCp, cp, style);
   }
 
   const int is2Bit = fontFamily.getData(style)->is2Bit;
