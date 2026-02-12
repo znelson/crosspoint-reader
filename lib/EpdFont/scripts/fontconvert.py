@@ -17,6 +17,7 @@ parser.add_argument("fontstack", action="store", nargs='+', help="list of font f
 parser.add_argument("--2bit", dest="is2Bit", action="store_true", help="generate 2-bit greyscale bitmap instead of 1-bit black and white.")
 parser.add_argument("--additional-intervals", dest="additional_intervals", action="append", help="Additional code point intervals to export as min,max. This argument can be repeated.")
 parser.add_argument("--kern-scope", dest="kern_scope", choices=["all", "english"], default="all", help="Restrict kerning extraction to a character subset. 'english' limits to ASCII + Latin-1 accented + typographic punctuation (~200 chars). Default: all.")
+parser.add_argument("--ligature-scope", dest="ligature_scope", choices=["all", "english"], default="all", help="Restrict ligature extraction to a character subset. 'english' limits to ASCII + Latin-1 accented + typographic punctuation. Default: all.")
 args = parser.parse_args()
 
 GlyphProps = namedtuple("GlyphProps", ["width", "height", "advance_x", "left", "top", "data_length", "data_offset", "code_point"])
@@ -103,6 +104,9 @@ intervals = [
     # (0xFE30, 0xFE4F),
     # # CJK Compatibility Ideographs
     # (0xF900, 0xFAFF),
+    ### Alphabetic Presentation Forms (Latin ligatures) ###
+    # ff, fi, fl, ffi, ffl, long-st, st
+    (0xFB00, 0xFB06),
     ### Specials
     # Replacement Character
     (0xFFFD, 0xFFFD),
@@ -428,6 +432,186 @@ for face_idx, cps in face_idx_cps.items():
 kern_pairs.sort(key=lambda p: p[0])
 print(f"kerning: {len(kern_pairs)} pairs extracted", file=sys.stderr)
 
+# --- Ligature pair extraction ---
+# Parse the OpenType GSUB table for LigatureSubst (type 4) lookups.
+# Multi-character ligatures (3+ codepoints) are decomposed into chained
+# pairs when an intermediate ligature exists (e.g., ffi = ff + i where ff
+# is itself a ligature). Only pairs where both input codepoints and the
+# output codepoint are in the generated glyph set are included.
+
+all_codepoints_set = set(all_codepoints)
+
+# Scope filtering for ligatures (mirrors kern scope)
+LIGATURE_ENGLISH_CODEPOINTS = (
+    frozenset(range(0x0020, 0x007F)) |  # ASCII printable
+    frozenset(range(0x00A0, 0x0100)) |  # Latin-1 Supplement
+    frozenset(range(0xFB00, 0xFB07)) |  # Alphabetic Presentation Forms (ligature codepoints)
+    frozenset({0x2013, 0x2014,          # en dash, em dash
+               0x2018, 0x2019,          # left/right single quote
+               0x201A,                  # single low-9 quotation mark
+               0x201C, 0x201D,          # left/right double quote
+               0x201E,                  # double low-9 quotation mark
+               0x2026})                 # horizontal ellipsis
+)
+
+# Standard Unicode ligature codepoints for known input sequences.
+# Used as a fallback when the GSUB substitute glyph has no cmap entry.
+STANDARD_LIGATURE_MAP = {
+    (0x66, 0x66):       0xFB00,  # ff
+    (0x66, 0x69):       0xFB01,  # fi
+    (0x66, 0x6C):       0xFB02,  # fl
+    (0x66, 0x66, 0x69): 0xFB03,  # ffi
+    (0x66, 0x66, 0x6C): 0xFB04,  # ffl
+    (0x17F, 0x74):      0xFB05,  # long-s + t
+    (0x73, 0x74):       0xFB06,  # st
+}
+
+def extract_ligatures_fonttools(font_path, codepoints):
+    """Extract ligature substitution pairs from a font file using fonttools.
+
+    Returns list of (packed_pair, ligature_codepoint) for the given codepoints.
+    Multi-character ligatures are decomposed into chained pairs.
+    """
+    font = TTFont(font_path)
+    cmap = font.getBestCmap() or {}
+
+    # Build glyph_name -> codepoint and codepoint -> glyph_name maps
+    glyph_to_cp = {}
+    cp_to_glyph = {}
+    for cp, gname in cmap.items():
+        glyph_to_cp[gname] = cp
+        cp_to_glyph[cp] = gname
+
+    # Collect raw ligature rules: (sequence_of_codepoints) -> ligature_codepoint
+    raw_ligatures = {}  # tuple of codepoints -> ligature codepoint
+
+    if 'GSUB' in font:
+        gsub = font['GSUB'].table
+
+        # Find lookup indices for 'liga' and 'rlig' features
+        liga_lookup_indices = set()
+        if gsub.FeatureList:
+            for fr in gsub.FeatureList.FeatureRecord:
+                if fr.FeatureTag in ('liga', 'rlig'):
+                    liga_lookup_indices.update(fr.Feature.LookupListIndex)
+
+        for li in liga_lookup_indices:
+            lookup = gsub.LookupList.Lookup[li]
+            for st in lookup.SubTable:
+                actual = st
+                # Unwrap Extension (lookup type 7) wrappers
+                if lookup.LookupType == 7 and hasattr(st, 'ExtSubTable'):
+                    actual = st.ExtSubTable
+                # LigatureSubst is lookup type 4
+                if not hasattr(actual, 'ligatures'):
+                    continue
+                for first_glyph, ligature_list in actual.ligatures.items():
+                    if first_glyph not in glyph_to_cp:
+                        continue
+                    first_cp = glyph_to_cp[first_glyph]
+                    for lig in ligature_list:
+                        # lig.Component is a list of subsequent glyph names
+                        # lig.LigGlyph is the substitute glyph name
+                        component_cps = []
+                        valid = True
+                        for comp_glyph in lig.Component:
+                            if comp_glyph not in glyph_to_cp:
+                                valid = False
+                                break
+                            component_cps.append(glyph_to_cp[comp_glyph])
+                        if not valid:
+                            continue
+                        seq = tuple([first_cp] + component_cps)
+                        if lig.LigGlyph in glyph_to_cp:
+                            lig_cp = glyph_to_cp[lig.LigGlyph]
+                        elif seq in STANDARD_LIGATURE_MAP:
+                            # GSUB glyph has no cmap entry; fall back to the
+                            # standard Unicode ligature codepoint for this sequence
+                            lig_cp = STANDARD_LIGATURE_MAP[seq]
+                        else:
+                            continue
+                        raw_ligatures[seq] = lig_cp
+
+    font.close()
+
+    # Filter: only keep ligatures where all input and output codepoints are
+    # in our generated glyph set
+    filtered = {}
+    for seq, lig_cp in raw_ligatures.items():
+        if lig_cp not in codepoints and lig_cp not in all_codepoints_set:
+            continue
+        if all(cp in codepoints for cp in seq):
+            filtered[seq] = lig_cp
+
+    # Decompose into chained pairs
+    # For 2-codepoint sequences: direct pair (a, b) -> lig
+    # For 3+ codepoint sequences: chain through intermediates
+    #   e.g., (f, f, i) -> ffi requires (f, f) -> ff to exist,
+    #   then we add (ff, i) -> ffi
+    pairs = []
+    # First pass: collect all 2-codepoint ligatures
+    two_char = {seq: lig_cp for seq, lig_cp in filtered.items() if len(seq) == 2}
+    for seq, lig_cp in two_char.items():
+        packed = (seq[0] << 16) | seq[1]
+        pairs.append((packed, lig_cp))
+
+    # Second pass: decompose 3+ codepoint ligatures into chained pairs
+    for seq, lig_cp in filtered.items():
+        if len(seq) < 3:
+            continue
+        # Try to find an intermediate: check if the first N-1 codepoints
+        # form a known ligature, then chain (intermediate, last) -> lig
+        prefix = seq[:-1]
+        last_cp = seq[-1]
+        if prefix in filtered:
+            intermediate_cp = filtered[prefix]
+            packed = (intermediate_cp << 16) | last_cp
+            pairs.append((packed, lig_cp))
+        else:
+            print(f"ligatures: skipping {len(seq)}-char ligature "
+                  f"({', '.join(f'U+{cp:04X}' for cp in seq)}) -> U+{lig_cp:04X}: "
+                  f"no intermediate ligature for prefix", file=sys.stderr)
+
+    return pairs
+
+# Build ligature codepoint set independently from kerning scope.
+# We need all codepoints in the glyph set (minus combining marks),
+# including ligature output codepoints (U+FB00-FB06).
+ligature_codepoints = set(cp for cp in all_codepoints
+                          if not (COMBINING_MARKS_START <= cp <= COMBINING_MARKS_END))
+
+if args.ligature_scope == 'english':
+    ligature_codepoints &= LIGATURE_ENGLISH_CODEPOINTS
+    print(f"ligatures: scope limited to 'english' ({len(ligature_codepoints)} codepoints)", file=sys.stderr)
+
+# Map ligature codepoints to the font-stack index that serves them
+lig_cp_to_face_idx = {}
+for cp in ligature_codepoints:
+    for face_idx, f in enumerate(font_stack):
+        if f.get_char_index(cp) > 0:
+            lig_cp_to_face_idx[cp] = face_idx
+            break
+
+# Group by face index
+lig_face_idx_cps = {}
+for cp, fi in lig_cp_to_face_idx.items():
+    lig_face_idx_cps.setdefault(fi, set()).add(cp)
+
+ligature_pairs = []
+for face_idx, cps in lig_face_idx_cps.items():
+    font_path = args.fontstack[face_idx]
+    ligature_pairs.extend(extract_ligatures_fonttools(font_path, cps))
+
+# Deduplicate (keep first occurrence) and sort
+seen_lig_keys = set()
+unique_ligature_pairs = []
+for packed, lig_cp in ligature_pairs:
+    if packed not in seen_lig_keys:
+        seen_lig_keys.add(packed)
+        unique_ligature_pairs.append((packed, lig_cp))
+ligature_pairs = sorted(unique_ligature_pairs, key=lambda p: p[0])
+print(f"ligatures: {len(ligature_pairs)} pairs extracted", file=sys.stderr)
+
 print(f"""/**
  * generated by fontconvert.py
  * name: {font_name}
@@ -466,6 +650,17 @@ if kern_pairs:
         print(f"    {{ 0x{packed_pair:08X}, {adjust} }}, // {comment_l} {comment_r}")
     print("};\n")
 
+if ligature_pairs:
+    print(f"static const EpdLigaturePair {font_name}LigaturePairs[] = {{")
+    for packed_pair, lig_cp in ligature_pairs:
+        left_cp = packed_pair >> 16
+        right_cp = packed_pair & 0xFFFF
+        comment_l = chr(left_cp) if 0x20 < left_cp < 0x7F else f'U+{left_cp:04X}'
+        comment_r = chr(right_cp) if 0x20 < right_cp < 0x7F else f'U+{right_cp:04X}'
+        comment_lig = chr(lig_cp) if 0x20 < lig_cp < 0x7F else f'U+{lig_cp:04X}'
+        print(f"    {{ 0x{packed_pair:08X}, 0x{lig_cp:04X} }}, // {comment_l} {comment_r} -> {comment_lig}")
+    print("};\n")
+
 print(f"static const EpdFontData {font_name} = {{")
 print(f"    {font_name}Bitmaps,")
 print(f"    {font_name}Glyphs,")
@@ -478,6 +673,12 @@ print(f"    {'true' if is2Bit else 'false'},")
 if kern_pairs:
     print(f"    {font_name}KernPairs,")
     print(f"    {len(kern_pairs)},")
+else:
+    print(f"    nullptr,")
+    print(f"    0,")
+if ligature_pairs:
+    print(f"    {font_name}LigaturePairs,")
+    print(f"    {len(ligature_pairs)},")
 else:
     print(f"    nullptr,")
     print(f"    0,")

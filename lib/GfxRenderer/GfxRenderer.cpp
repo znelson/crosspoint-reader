@@ -114,6 +114,15 @@ void GfxRenderer::drawText(const int fontId, const int x, const int y, const cha
   uint32_t cp;
   uint32_t prevCp = 0;
   while ((cp = utf8NextCodepoint(reinterpret_cast<const uint8_t**>(&text)))) {
+    // Ligature chaining: substitute while pairs match
+    while (true) {
+      const auto saved = reinterpret_cast<const uint8_t*>(text);
+      const uint32_t nextCp = utf8NextCodepoint(reinterpret_cast<const uint8_t**>(&text));
+      if (nextCp == 0) break;
+      const uint32_t lig = font.getLigature(cp, nextCp, style);
+      if (lig == 0) { text = reinterpret_cast<const char*>(saved); break; }
+      cp = lig;
+    }
     renderChar(font, cp, &xpos, &yPos, black, style, prevCp);
     prevCp = cp;
   }
@@ -730,6 +739,15 @@ int GfxRenderer::getTextAdvanceX(const int fontId, const char* text) const {
   int width = 0;
   const EpdFontFamily& family = fontMap.at(fontId);
   while ((cp = utf8NextCodepoint(reinterpret_cast<const uint8_t**>(&text)))) {
+    // Ligature chaining: substitute while pairs match
+    while (true) {
+      const auto saved = reinterpret_cast<const uint8_t*>(text);
+      const uint32_t nextCp = utf8NextCodepoint(reinterpret_cast<const uint8_t**>(&text));
+      if (nextCp == 0) break;
+      const uint32_t lig = family.getLigature(cp, nextCp, EpdFontFamily::REGULAR);
+      if (lig == 0) { text = reinterpret_cast<const char*>(saved); break; }
+      cp = lig;
+    }
     if (prevCp != 0) {
       width += family.getKerning(prevCp, cp, EpdFontFamily::REGULAR);
     }
@@ -792,6 +810,16 @@ void GfxRenderer::drawTextRotated90CW(const int fontId, const int x, const int y
   uint32_t cp;
   uint32_t prevCp = 0;
   while ((cp = utf8NextCodepoint(reinterpret_cast<const uint8_t**>(&text)))) {
+    // Ligature chaining: substitute while pairs match
+    while (true) {
+      const auto saved = reinterpret_cast<const uint8_t*>(text);
+      const uint32_t nextCp = utf8NextCodepoint(reinterpret_cast<const uint8_t**>(&text));
+      if (nextCp == 0) break;
+      const uint32_t lig = font.getLigature(cp, nextCp, style);
+      if (lig == 0) { text = reinterpret_cast<const char*>(saved); break; }
+      cp = lig;
+    }
+
     const EpdGlyph* glyph = font.getGlyph(cp, style);
     if (!glyph) {
       glyph = font.getGlyph(REPLACEMENT_GLYPH, style);

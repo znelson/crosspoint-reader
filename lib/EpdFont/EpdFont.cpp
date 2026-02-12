@@ -4,6 +4,8 @@
 
 #include <algorithm>
 
+bool EpdFont::ligaturesEnabled = true;
+
 void EpdFont::getTextBounds(const char* string, const int startX, const int startY, int* minX, int* minY, int* maxX,
                             int* maxY) const {
   *minX = startX;
@@ -20,6 +22,16 @@ void EpdFont::getTextBounds(const char* string, const int startX, const int star
   uint32_t cp;
   uint32_t prevCp = 0;
   while ((cp = utf8NextCodepoint(reinterpret_cast<const uint8_t**>(&string)))) {
+    // Ligature chaining: substitute while pairs match
+    while (true) {
+      const auto saved = reinterpret_cast<const uint8_t*>(string);
+      const uint32_t nextCp = utf8NextCodepoint(reinterpret_cast<const uint8_t**>(&string));
+      if (nextCp == 0) break;
+      const uint32_t lig = getLigature(cp, nextCp);
+      if (lig == 0) { string = reinterpret_cast<const char*>(saved); break; }
+      cp = lig;
+    }
+
     const EpdGlyph* glyph = getGlyph(cp);
 
     if (!glyph) {
@@ -75,6 +87,32 @@ int8_t EpdFont::getKerning(const uint32_t leftCp, const uint32_t rightCp) const 
     const int mid = left + (right - left) / 2;
     if (pairs[mid].pair == key) {
       return pairs[mid].adjust;
+    }
+    if (pairs[mid].pair < key) {
+      left = mid + 1;
+    } else {
+      right = mid - 1;
+    }
+  }
+
+  return 0;
+}
+
+uint32_t EpdFont::getLigature(const uint32_t leftCp, const uint32_t rightCp) const {
+  if (!ligaturesEnabled) return 0;
+  if (!data->ligaturePairs || data->ligaturePairCount == 0) {
+    return 0;
+  }
+
+  const uint32_t key = (leftCp << 16) | (rightCp & 0xFFFF);
+  const EpdLigaturePair* pairs = data->ligaturePairs;
+  int left = 0;
+  int right = static_cast<int>(data->ligaturePairCount) - 1;
+
+  while (left <= right) {
+    const int mid = left + (right - left) / 2;
+    if (pairs[mid].pair == key) {
+      return pairs[mid].ligatureCp;
     }
     if (pairs[mid].pair < key) {
       left = mid + 1;
