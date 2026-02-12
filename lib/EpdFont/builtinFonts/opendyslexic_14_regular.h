@@ -3,7 +3,7 @@
  * name: opendyslexic_14_regular
  * size: 14
  * mode: 2-bit
- * Command used: fontconvert.py opendyslexic_14_regular 14 ../builtinFonts/source/OpenDyslexic/OpenDyslexic-Regular.otf --2bit
+ * Command used: fontconvert.py opendyslexic_14_regular 14 ../builtinFonts/source/OpenDyslexic/OpenDyslexic-Regular.otf --2bit --kern-scope english
  */
 #pragma once
 #include "EpdFontData.h"
@@ -5235,6 +5235,44 @@ static const EpdUnicodeInterval opendyslexic_14_regularIntervals[] = {
     { 0x2264, 0x2265, 0x2D3 },
 };
 
+static const EpdKernPair opendyslexic_14_regularKernPairs[] = {
+    { 0x00210020, 4 }, // ! U+0020
+    { 0x00220020, 4 }, // " U+0020
+    { 0x00230020, 4 }, // # U+0020
+    { 0x00270020, 4 }, // ' U+0020
+    { 0x00280020, 4 }, // ( U+0020
+    { 0x00290020, 4 }, // ) U+0020
+    { 0x002A0020, 4 }, // * U+0020
+    { 0x002C0020, 4 }, // , U+0020
+    { 0x002D0020, 4 }, // - U+0020
+    { 0x002E0020, 4 }, // . U+0020
+    { 0x002F0020, 4 }, // / U+0020
+    { 0x003A0020, 4 }, // : U+0020
+    { 0x003B0020, 4 }, // ; U+0020
+    { 0x003F0020, 4 }, // ? U+0020
+    { 0x005B0020, 4 }, // [ U+0020
+    { 0x005C0020, 4 }, // \ U+0020
+    { 0x005D0020, 4 }, // ] U+0020
+    { 0x005F0020, 4 }, // _ U+0020
+    { 0x007B0020, 4 }, // { U+0020
+    { 0x007D0020, 4 }, // } U+0020
+    { 0x00A10020, 4 }, // U+00A1 U+0020
+    { 0x00AB0020, 4 }, // U+00AB U+0020
+    { 0x00AD0020, 4 }, // U+00AD U+0020
+    { 0x00B70020, 4 }, // U+00B7 U+0020
+    { 0x00BB0020, 4 }, // U+00BB U+0020
+    { 0x00BF0020, 4 }, // U+00BF U+0020
+    { 0x20130020, 4 }, // U+2013 U+0020
+    { 0x20140020, 4 }, // U+2014 U+0020
+    { 0x20180020, 4 }, // U+2018 U+0020
+    { 0x20190020, 4 }, // U+2019 U+0020
+    { 0x201A0020, 4 }, // U+201A U+0020
+    { 0x201C0020, 4 }, // U+201C U+0020
+    { 0x201D0020, 4 }, // U+201D U+0020
+    { 0x201E0020, 4 }, // U+201E U+0020
+    { 0x20260020, 4 }, // U+2026 U+0020
+};
+
 static const EpdFontData opendyslexic_14_regular = {
     opendyslexic_14_regularBitmaps,
     opendyslexic_14_regularGlyphs,
@@ -5244,4 +5282,6 @@ static const EpdFontData opendyslexic_14_regular = {
     38,
     -16,
     true,
+    opendyslexic_14_regularKernPairs,
+    35,
 };

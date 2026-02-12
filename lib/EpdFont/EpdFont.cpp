@@ -18,6 +18,7 @@ void EpdFont::getTextBounds(const char* string, const int startX, const int star
   int cursorX = startX;
   const int cursorY = startY;
   uint32_t cp;
+  uint32_t prevCp = 0;
   while ((cp = utf8NextCodepoint(reinterpret_cast<const uint8_t**>(&string)))) {
     const EpdGlyph* glyph = getGlyph(cp);
 
@@ -30,11 +31,16 @@ void EpdFont::getTextBounds(const char* string, const int startX, const int star
       continue;
     }
 
+    if (prevCp != 0) {
+      cursorX += getKerning(prevCp, cp);
+    }
+
     *minX = std::min(*minX, cursorX + glyph->left);
     *maxX = std::max(*maxX, cursorX + glyph->left + glyph->width);
     *minY = std::min(*minY, cursorY + glyph->top - glyph->height);
     *maxY = std::max(*maxY, cursorY + glyph->top);
     cursorX += glyph->advanceX;
+    prevCp = cp;
   }
 }
 
@@ -53,6 +59,31 @@ bool EpdFont::hasPrintableChars(const char* string) const {
   getTextDimensions(string, &w, &h);
 
   return w > 0 || h > 0;
+}
+
+int8_t EpdFont::getKerning(const uint32_t leftCp, const uint32_t rightCp) const {
+  if (!data->kernPairs || data->kernPairCount == 0) {
+    return 0;
+  }
+
+  const uint32_t key = (leftCp << 16) | (rightCp & 0xFFFF);
+  const EpdKernPair* pairs = data->kernPairs;
+  int left = 0;
+  int right = static_cast<int>(data->kernPairCount) - 1;
+
+  while (left <= right) {
+    const int mid = left + (right - left) / 2;
+    if (pairs[mid].pair == key) {
+      return pairs[mid].adjust;
+    }
+    if (pairs[mid].pair < key) {
+      left = mid + 1;
+    } else {
+      right = mid - 1;
+    }
+  }
+
+  return 0;
 }
 
 const EpdGlyph* EpdFont::getGlyph(const uint32_t cp) const {
