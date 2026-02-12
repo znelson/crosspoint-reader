@@ -10,8 +10,6 @@
 #include "CrossPointState.h"
 #include "EpubReaderChapterSelectionActivity.h"
 #include "EpubReaderPercentSelectionActivity.h"
-#include "KOReaderCredentialStore.h"
-#include "KOReaderSyncActivity.h"
 #include "MappedInputManager.h"
 #include "RecentBooksStore.h"
 #include "components/UITheme.h"
@@ -456,28 +454,6 @@ void EpubReaderActivity::onReaderMenuConfirm(EpubReaderMenuActivity::MenuAction 
       break;
     }
     case EpubReaderMenuActivity::MenuAction::SYNC: {
-      if (KOREADER_STORE.hasCredentials()) {
-        xSemaphoreTake(renderingMutex, portMAX_DELAY);
-        const int currentPage = section ? section->currentPage : 0;
-        const int totalPages = section ? section->pageCount : 0;
-        exitActivity();
-        enterNewActivity(new KOReaderSyncActivity(
-            renderer, mappedInput, epub, epub->getPath(), currentSpineIndex, currentPage, totalPages,
-            [this]() {
-              // On cancel - defer exit to avoid use-after-free
-              pendingSubactivityExit = true;
-            },
-            [this](int newSpineIndex, int newPage) {
-              // On sync complete - update position and defer exit
-              if (currentSpineIndex != newSpineIndex || (section && section->currentPage != newPage)) {
-                currentSpineIndex = newSpineIndex;
-                nextPageNumber = newPage;
-                section.reset();
-              }
-              pendingSubactivityExit = true;
-            }));
-        xSemaphoreGive(renderingMutex);
-      }
       break;
     }
   }

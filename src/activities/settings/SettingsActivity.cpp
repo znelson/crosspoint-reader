@@ -4,14 +4,10 @@
 #include <Logging.h>
 
 #include "ButtonRemapActivity.h"
-#include "CalibreSettingsActivity.h"
 #include "ClearCacheActivity.h"
 #include "CrossPointSettings.h"
-#include "KOReaderSettingsActivity.h"
 #include "MappedInputManager.h"
-#include "OtaUpdateActivity.h"
 #include "SettingsList.h"
-#include "activities/network/WifiSelectionActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 
@@ -43,17 +39,12 @@ void SettingsActivity::onEnter() {
     } else if (strcmp(setting.category, "System") == 0) {
       systemSettings.push_back(std::move(setting));
     }
-    // Web-only categories (KOReader Sync, OPDS Browser) are skipped for device UI
   }
 
   // Append device-only ACTION items
   controlsSettings.insert(controlsSettings.begin(),
                           SettingInfo::Action("Remap Front Buttons", SettingAction::RemapFrontButtons));
-  systemSettings.push_back(SettingInfo::Action("Network", SettingAction::Network));
-  systemSettings.push_back(SettingInfo::Action("KOReader Sync", SettingAction::KOReaderSync));
-  systemSettings.push_back(SettingInfo::Action("OPDS Browser", SettingAction::OPDSBrowser));
   systemSettings.push_back(SettingInfo::Action("Clear Cache", SettingAction::ClearCache));
-  systemSettings.push_back(SettingInfo::Action("Check for updates", SettingAction::CheckForUpdates));
 
   // Reset selection to first category
   selectedCategoryIndex = 0;
@@ -202,20 +193,8 @@ void SettingsActivity::toggleCurrentSetting() {
       case SettingAction::RemapFrontButtons:
         enterSubActivity(new ButtonRemapActivity(renderer, mappedInput, onComplete));
         break;
-      case SettingAction::KOReaderSync:
-        enterSubActivity(new KOReaderSettingsActivity(renderer, mappedInput, onComplete));
-        break;
-      case SettingAction::OPDSBrowser:
-        enterSubActivity(new CalibreSettingsActivity(renderer, mappedInput, onComplete));
-        break;
-      case SettingAction::Network:
-        enterSubActivity(new WifiSelectionActivity(renderer, mappedInput, onCompleteBool, false));
-        break;
       case SettingAction::ClearCache:
         enterSubActivity(new ClearCacheActivity(renderer, mappedInput, onComplete));
-        break;
-      case SettingAction::CheckForUpdates:
-        enterSubActivity(new OtaUpdateActivity(renderer, mappedInput, onComplete));
         break;
       case SettingAction::None:
         // Do nothing

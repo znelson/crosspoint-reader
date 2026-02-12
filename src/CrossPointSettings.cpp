@@ -103,13 +103,10 @@ bool CrossPointSettings::saveToFile() const {
   serialization::writePod(outputFile, refreshFrequency);
   serialization::writePod(outputFile, screenMargin);
   serialization::writePod(outputFile, sleepScreenCoverMode);
-  serialization::writeString(outputFile, std::string(opdsServerUrl));
   serialization::writePod(outputFile, textAntiAliasing);
   serialization::writePod(outputFile, hideBatteryPercentage);
   serialization::writePod(outputFile, longPressChapterSkip);
   serialization::writePod(outputFile, hyphenationEnabled);
-  serialization::writeString(outputFile, std::string(opdsUsername));
-  serialization::writeString(outputFile, std::string(opdsPassword));
   serialization::writePod(outputFile, sleepScreenCoverFilter);
   serialization::writePod(outputFile, uiTheme);
   serialization::writePod(outputFile, frontButtonBack);
@@ -177,13 +174,6 @@ bool CrossPointSettings::loadFromFile() {
     if (++settingsRead >= fileSettingsCount) break;
     readAndValidate(inputFile, sleepScreenCoverMode, SLEEP_SCREEN_COVER_MODE_COUNT);
     if (++settingsRead >= fileSettingsCount) break;
-    {
-      std::string urlStr;
-      serialization::readString(inputFile, urlStr);
-      strncpy(opdsServerUrl, urlStr.c_str(), sizeof(opdsServerUrl) - 1);
-      opdsServerUrl[sizeof(opdsServerUrl) - 1] = '\0';
-    }
-    if (++settingsRead >= fileSettingsCount) break;
     serialization::readPod(inputFile, textAntiAliasing);
     if (++settingsRead >= fileSettingsCount) break;
     readAndValidate(inputFile, hideBatteryPercentage, HIDE_BATTERY_PERCENTAGE_COUNT);
@@ -191,20 +181,6 @@ bool CrossPointSettings::loadFromFile() {
     serialization::readPod(inputFile, longPressChapterSkip);
     if (++settingsRead >= fileSettingsCount) break;
     serialization::readPod(inputFile, hyphenationEnabled);
-    if (++settingsRead >= fileSettingsCount) break;
-    {
-      std::string usernameStr;
-      serialization::readString(inputFile, usernameStr);
-      strncpy(opdsUsername, usernameStr.c_str(), sizeof(opdsUsername) - 1);
-      opdsUsername[sizeof(opdsUsername) - 1] = '\0';
-    }
-    if (++settingsRead >= fileSettingsCount) break;
-    {
-      std::string passwordStr;
-      serialization::readString(inputFile, passwordStr);
-      strncpy(opdsPassword, passwordStr.c_str(), sizeof(opdsPassword) - 1);
-      opdsPassword[sizeof(opdsPassword) - 1] = '\0';
-    }
     if (++settingsRead >= fileSettingsCount) break;
     readAndValidate(inputFile, sleepScreenCoverFilter, SLEEP_SCREEN_COVER_FILTER_COUNT);
     if (++settingsRead >= fileSettingsCount) break;

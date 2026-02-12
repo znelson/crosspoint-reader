@@ -3,7 +3,6 @@
 #include <vector>
 
 #include "CrossPointSettings.h"
-#include "KOReaderCredentialStore.h"
 #include "activities/settings/SettingsActivity.h"
 
 // Shared settings list used by both the device settings UI and the web settings API.
@@ -58,44 +57,5 @@ inline std::vector<SettingInfo> getSettingsList() {
       // --- System ---
       SettingInfo::Enum("Time to Sleep", &CrossPointSettings::sleepTimeout,
                         {"1 min", "5 min", "10 min", "15 min", "30 min"}, "sleepTimeout", "System"),
-
-      // --- KOReader Sync (web-only, uses KOReaderCredentialStore) ---
-      SettingInfo::DynamicString(
-          "KOReader Username", [] { return KOREADER_STORE.getUsername(); },
-          [](const std::string& v) {
-            KOREADER_STORE.setCredentials(v, KOREADER_STORE.getPassword());
-            KOREADER_STORE.saveToFile();
-          },
-          "koUsername", "KOReader Sync"),
-      SettingInfo::DynamicString(
-          "KOReader Password", [] { return KOREADER_STORE.getPassword(); },
-          [](const std::string& v) {
-            KOREADER_STORE.setCredentials(KOREADER_STORE.getUsername(), v);
-            KOREADER_STORE.saveToFile();
-          },
-          "koPassword", "KOReader Sync"),
-      SettingInfo::DynamicString(
-          "Sync Server URL", [] { return KOREADER_STORE.getServerUrl(); },
-          [](const std::string& v) {
-            KOREADER_STORE.setServerUrl(v);
-            KOREADER_STORE.saveToFile();
-          },
-          "koServerUrl", "KOReader Sync"),
-      SettingInfo::DynamicEnum(
-          "Document Matching", {"Filename", "Binary"},
-          [] { return static_cast<uint8_t>(KOREADER_STORE.getMatchMethod()); },
-          [](uint8_t v) {
-            KOREADER_STORE.setMatchMethod(static_cast<DocumentMatchMethod>(v));
-            KOREADER_STORE.saveToFile();
-          },
-          "koMatchMethod", "KOReader Sync"),
-
-      // --- OPDS Browser (web-only, uses CrossPointSettings char arrays) ---
-      SettingInfo::String("OPDS Server URL", SETTINGS.opdsServerUrl, sizeof(SETTINGS.opdsServerUrl), "opdsServerUrl",
-                          "OPDS Browser"),
-      SettingInfo::String("OPDS Username", SETTINGS.opdsUsername, sizeof(SETTINGS.opdsUsername), "opdsUsername",
-                          "OPDS Browser"),
-      SettingInfo::String("OPDS Password", SETTINGS.opdsPassword, sizeof(SETTINGS.opdsPassword), "opdsPassword",
-                          "OPDS Browser"),
   };
 }

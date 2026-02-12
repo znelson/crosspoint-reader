@@ -25,12 +25,9 @@ void HomeActivity::taskTrampoline(void* param) {
 }
 
 int HomeActivity::getMenuItemCount() const {
-  int count = 4;  // My Library, Recents, File transfer, Settings
+  int count = 3;  // My Library, Recents, Settings
   if (!recentBooks.empty()) {
     count += recentBooks.size();
-  }
-  if (hasOpdsUrl) {
-    count++;
   }
   return count;
 }
@@ -117,9 +114,6 @@ void HomeActivity::onEnter() {
   Activity::onEnter();
 
   renderingMutex = xSemaphoreCreateMutex();
-
-  // Check if OPDS browser URL is configured
-  hasOpdsUrl = strlen(SETTINGS.opdsServerUrl) > 0;
 
   selectorIndex = 0;
 
@@ -214,8 +208,6 @@ void HomeActivity::loop() {
     int menuSelectedIndex = selectorIndex - static_cast<int>(recentBooks.size());
     const int myLibraryIdx = idx++;
     const int recentsIdx = idx++;
-    const int opdsLibraryIdx = hasOpdsUrl ? idx++ : -1;
-    const int fileTransferIdx = idx++;
     const int settingsIdx = idx;
 
     if (selectorIndex < recentBooks.size()) {
@@ -224,10 +216,6 @@ void HomeActivity::loop() {
       onMyLibraryOpen();
     } else if (menuSelectedIndex == recentsIdx) {
       onRecentsOpen();
-    } else if (menuSelectedIndex == opdsLibraryIdx) {
-      onOpdsBrowserOpen();
-    } else if (menuSelectedIndex == fileTransferIdx) {
-      onFileTransferOpen();
     } else if (menuSelectedIndex == settingsIdx) {
       onSettingsOpen();
     }
@@ -261,11 +249,7 @@ void HomeActivity::render() {
                           std::bind(&HomeActivity::storeCoverBuffer, this));
 
   // Build menu items dynamically
-  std::vector<const char*> menuItems = {"Browse Files", "Recents", "File Transfer", "Settings"};
-  if (hasOpdsUrl) {
-    // Insert OPDS Browser after My Library
-    menuItems.insert(menuItems.begin() + 2, "OPDS Browser");
-  }
+  std::vector<const char*> menuItems = {"Browse Files", "Recents", "Settings"};
 
   GUI.drawButtonMenu(
       renderer,
