@@ -119,7 +119,6 @@ COLOR_KEYWORDS: dict[str, list[str]] = {
         "SETTINGS",
         "[CLEAR_CACHE]",
         "[CHAP]",
-        "[OPDS]",
         "[COF]",
     ],
     Fore.LIGHTBLACK_EX: [

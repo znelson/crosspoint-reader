@@ -12,10 +12,8 @@ Welcome to the **CrossPoint** firmware. This guide outlines the hardware control
     - [3.1 Home Screen](#31-home-screen)
     - [3.2 Book Selection](#32-book-selection)
     - [3.3 Reading Mode](#33-reading-mode)
-    - [3.4 File Upload Screen](#34-file-upload-screen)
-    - [3.4.1 Calibre Wireless Transfers](#341-calibre-wireless-transfers)
-    - [3.5 Settings](#35-settings)
-    - [3.6 Sleep Screen](#36-sleep-screen)
+    - [3.4 Settings](#34-settings)
+    - [3.5 Sleep Screen](#35-sleep-screen)
   - [4. Reading Mode](#4-reading-mode)
     - [Page Turning](#page-turning)
     - [Chapter Navigation](#chapter-navigation)
@@ -36,7 +34,7 @@ The device utilises the standard buttons on the Xtink X4 (in the same layout as 
 | **Bottom Edge** | **Back**, **Confirm**, **Left**, **Right**           |
 | **Right Side**  | **Power**, **Volume Up**, **Volume Down**, **Reset** |
 
-Button layout can be customized in **[Settings](#35-settings)**.
+Button layout can be customized in **[Settings](#34-settings)**.
 
 ---
 
@@ -45,7 +43,7 @@ Button layout can be customized in **[Settings](#35-settings)**.
 ### Power On / Off
 
 To turn the device on or off, **press and hold the Power button for approximately half a second**.
-In **[Settings](#35-settings)** you can configure the power button to turn the device off with a short press instead of a long one.
+In **[Settings](#34-settings)** you can configure the power button to turn the device off with a short press instead of a long one.
 
 To reboot the device (for example if it's frozen, or after a firmware update), press and release the Reset button, and then quickly press and hold the Power button for a few seconds.
 
@@ -62,7 +60,7 @@ Upon turning the device on for the first time, you will be placed on the **[Home
 
 ### 3.1 Home Screen
 
-The Home Screen is the main entry point to the firmware. From here you can navigate to **[Reading Mode](#4-reading-mode)** with the most recently read book, **[Book Selection](#32-book-selection)**, **[Settings](#35-settings)**, or the **[File Upload](#34-file-upload-screen)** screen.
+The Home Screen is the main entry point to the firmware. From here you can navigate to **[Reading Mode](#4-reading-mode)** with the most recently read book, **[Book Selection](#32-book-selection)**, **[Settings](#34-settings)**, or the **[File Upload](#34-file-upload-screen)** screen.
 
 ### 3.2 Book Selection
 
@@ -75,34 +73,13 @@ The Book Selection acts as a folder and file browser.
 
 See [Reading Mode](#4-reading-mode) below for more information.
 
-### 3.4 File Upload Screen
-
-The File Upload screen allows you to upload new e-books to the device. When you enter the screen, you'll be prompted with a WiFi selection dialog and then your X4 will start hosting a web server.
-
-See the [webserver docs](./docs/webserver.md) for more information on how to connect to the web server and upload files.
-
-> [!TIP]
-> Advanced users can also manage files programmatically or via the command line using `curl`. See the [webserver docs](./docs/webserver.md) for details.
-
-### 3.4.1 Calibre Wireless Transfers
-
-CrossPoint supports sending books from Calibre using the CrossPoint Reader device plugin.
-
-1. Install the plugin in Calibre:
-   - Head to https://github.com/crosspoint-reader/calibre-plugins/releases to download the latest version of the crosspoint_reader plugin.
-   - Download the zip file.
-   - Open Calibre → Preferences → Plugins → Load plugin from file → Select the zip file.
-2. On the device: File Transfer → Connect to Calibre → Join a network.
-3. Make sure your computer is on the same WiFi network.
-4. In Calibre, click "Send to device" to transfer books.
-
-### 3.5 Settings
+### 3.4 Settings
 
 The Settings screen allows you to configure the device's behavior. There are a few settings you can adjust:
 - **Sleep Screen**: Which sleep screen to display when the device sleeps:
   - "Dark" (default) - The default dark Crosspoint logo sleep screen
   - "Light" - The same default sleep screen, on a white background
-  - "Custom" - Custom images from the SD card; see [Sleep Screen](#36-sleep-screen) below for more information
+  - "Custom" - Custom images from the SD card; see [Sleep Screen](#35-sleep-screen) below for more information
   - "Cover" - The book cover image (Note: this is experimental and may not work as expected)
   - "None" - A blank screen
   - "Cover + Custom" - The book cover image, fallbacks to "Custom" behavior
@@ -158,10 +135,8 @@ The Settings screen allows you to configure the device's behavior. There are a f
 - **Sunlight Fading Fix**: Configure whether to enable a software-fix for the issue where white X4 models may fade when used in direct sunlight
   - "OFF" (default) - Disable the fix
   - "ON" - Enable the fix
-- **OPDS Browser**: Configure OPDS server settings for browsing and downloading books. Set the server URL (for Calibre Content Server, add `/opds` to the end), and optionally configure username and password for servers requiring authentication. Note: Only HTTP Basic authentication is supported. If using Calibre Content Server with authentication enabled, you must set it to use Basic authentication instead of the default Digest authentication.
-- **Check for updates**: Check for firmware updates over WiFi.
 
-### 3.6 Sleep Screen
+### 3.5 Sleep Screen
 
 You can customize the sleep screen by placing custom images in specific locations on the SD card:
 
@@ -188,7 +163,7 @@ Once you have opened a book, the button layout changes to facilitate reading.
 | **Previous Page** | Press **Left** _or_ **Volume Up**    |
 | **Next Page**     | Press **Right** _or_ **Volume Down** |
 
-The role of the volume (side) buttons can be swapped in **[Settings](#35-settings)**.
+The role of the volume (side) buttons can be swapped in **[Settings](#34-settings)**.
 
 If the **Short Power Button Click** setting is set to "Page Turn", you can also turn to the next page by briefly pressing the Power button.
 
@@ -196,7 +171,7 @@ If the **Short Power Button Click** setting is set to "Page Turn", you can also 
 * **Next Chapter:** Press and **hold** the **Right** (or **Volume Down**) button briefly, then release.
 * **Previous Chapter:** Press and **hold** the **Left** (or **Volume Up**) button briefly, then release.
 
-This feature can be disabled in **[Settings](#35-settings)** to help avoid changing chapters by mistake.
+This feature can be disabled in **[Settings](#34-settings)** to help avoid changing chapters by mistake.
 
 
 ### System Navigation
