@@ -11,7 +11,7 @@ void GfxRenderer::begin() {
   }
 }
 
-void GfxRenderer::insertFont(const int fontId, EpdFontFamily font) { fontMap.insert({fontId, font}); }
+void GfxRenderer::insertFont(const int fontId, EpdFontFamily font) { fontMap.insert({fontId, std::move(font)}); }
 
 // Translate logical (x,y) coordinates to physical panel coordinates based on current orientation
 // This should always be inlined for better performance

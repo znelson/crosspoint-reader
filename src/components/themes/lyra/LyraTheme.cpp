@@ -313,7 +313,7 @@ void LyraTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect, const std:
     if (!coverRendered) {
       for (int i = 0; i < std::min(static_cast<int>(recentBooks.size()), LyraMetrics::values.homeRecentBooksCount);
            i++) {
-        std::string coverPath = recentBooks[i].coverBmpPath;
+        const auto& coverPath = recentBooks[i].coverBmpPath;
         int tileX = LyraMetrics::values.contentSidePadding + tileWidth * i;
         renderer.drawRect(tileX + hPaddingInSelection, tileY + hPaddingInSelection, tileWidth - 2 * hPaddingInSelection,
                           LyraMetrics::values.homeCoverHeight);
