@@ -39,14 +39,15 @@ static inline uint8_t alpha8to2bit(uint8_t a) {
 }
 
 // Pack a row of 2-bit pixels into bytes (MSB first, 4 pixels per byte).
-static void pack2bitRow(const uint8_t* alpha, int width, std::vector<uint8_t>& out) {
-    int i = 0;
+// Writes exactly (width + 3) / 4 bytes to `out`.
+static void pack2bitRow(const uint8_t* alpha, int width, uint8_t* out) {
+    int i = 0, outIdx = 0;
     while (i < width) {
         uint8_t byte = 0;
         for (int bit = 0; bit < 4 && i < width; bit++, i++) {
             byte |= alpha8to2bit(alpha[i]) << (6 - bit * 2);
         }
-        out.push_back(byte);
+        out[outIdx++] = byte;
     }
 }
 
@@ -87,8 +88,12 @@ std::vector<uint8_t> FontRasterizer::rasterize(const uint8_t* fontData, size_t f
 
     // Rasterize all glyphs
     std::vector<uint8_t> bitmapData;
+    bitmapData.reserve(totalCodepoints * std::max(1, (int)(ppem * ppem / 4)));
     std::vector<EpdGlyph> glyphs;
     glyphs.reserve(totalCodepoints);
+
+    // Reuse alpha buffer across glyphs to avoid per-glyph heap allocation
+    std::vector<uint8_t> alphaBuffer;
 
     int codepointsDone = 0;
     for (int intIdx = 0; intIdx < kIntervalCount; intIdx++) {
@@ -113,13 +118,17 @@ std::vector<uint8_t> FontRasterizer::rasterize(const uint8_t* fontData, size_t f
             g.dataOffset = (uint32_t)bitmapData.size();
 
             if (w > 0 && h > 0 && glyphIndex != 0) {
-                // Render 8-bit alpha bitmap
-                std::vector<uint8_t> alpha(w * h);
-                stbtt_MakeGlyphBitmap(&info, alpha.data(), w, h, w, scale, scale, glyphIndex);
+                // Render 8-bit alpha bitmap (reuse buffer to avoid allocation)
+                alphaBuffer.resize((size_t)w * h);
+                stbtt_MakeGlyphBitmap(&info, alphaBuffer.data(), w, h, w, scale, scale, glyphIndex);
 
-                // Pack to 2-bit
+                // Pack to 2-bit: pre-size output to avoid per-byte push_back
+                int packedRowBytes = (w + 3) / 4;
+                size_t bitmapOffset = bitmapData.size();
+                bitmapData.resize(bitmapOffset + (size_t)packedRowBytes * h);
                 for (int row = 0; row < h; row++) {
-                    pack2bitRow(alpha.data() + row * w, w, bitmapData);
+                    pack2bitRow(alphaBuffer.data() + row * w, w,
+                                bitmapData.data() + bitmapOffset + row * packedRowBytes);
                 }
             }
 
@@ -151,19 +160,24 @@ std::vector<uint8_t> FontRasterizer::rasterize(const uint8_t* fontData, size_t f
 
     // If GPOS yielded nothing, try stb_truetype's legacy kern table reader
     if (kernPairs.empty()) {
+        // Pre-build codepoint->glyphIndex mapping to avoid redundant
+        // FindGlyphIndex calls in the inner loop (O(N) lookups instead of O(N^2))
+        struct CpGid { uint32_t cp; int gid; };
+        std::vector<CpGid> validGlyphs;
+        validGlyphs.reserve(allCodepoints.size());
         for (size_t i = 0; i < allCodepoints.size(); i++) {
-            int g1 = stbtt_FindGlyphIndex(&info, allCodepoints[i]);
-            if (g1 == 0) continue;
-            for (size_t j = 0; j < allCodepoints.size(); j++) {
-                int g2 = stbtt_FindGlyphIndex(&info, allCodepoints[j]);
-                if (g2 == 0) continue;
-                int kern = stbtt_GetGlyphKernAdvance(&info, g1, g2);
+            int g = stbtt_FindGlyphIndex(&info, allCodepoints[i]);
+            if (g != 0) validGlyphs.push_back({allCodepoints[i], g});
+        }
+        for (size_t i = 0; i < validGlyphs.size(); i++) {
+            for (size_t j = 0; j < validGlyphs.size(); j++) {
+                int kern = stbtt_GetGlyphKernAdvance(&info, validGlyphs[i].gid, validGlyphs[j].gid);
                 if (kern == 0) continue;
                 int adj = (int)std::floor(kern * scale);
                 if (adj == 0) continue;
                 if (adj < -128) adj = -128;
                 if (adj > 127) adj = 127;
-                uint32_t packed = (allCodepoints[i] << 16) | (allCodepoints[j] & 0xFFFF);
+                uint32_t packed = (validGlyphs[i].cp << 16) | (validGlyphs[j].cp & 0xFFFF);
                 kernPairs.push_back({packed, (int8_t)adj});
             }
         }

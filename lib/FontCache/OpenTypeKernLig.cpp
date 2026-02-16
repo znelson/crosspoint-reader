@@ -6,6 +6,7 @@
 #include <map>
 #include <set>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace opentype {
 
@@ -31,80 +32,16 @@ static const uint8_t* findTable(const uint8_t* font, size_t fontLen, const char*
     return nullptr;
 }
 
-// --- Build reverse cmap: glyph ID -> first codepoint ---
-static std::unordered_map<uint16_t, uint32_t> buildReverseCmap(const uint8_t* font, size_t fontLen) {
+// --- Build both forward (cp -> glyph) and reverse (glyph -> first cp) cmap in one pass ---
+struct CmapResult {
     std::unordered_map<uint16_t, uint32_t> glyphToCp;
-    const uint8_t* cmap = findTable(font, fontLen, "cmap");
-    if (!cmap) return glyphToCp;
-
-    uint16_t numSubtables = u16(cmap + 2);
-    for (uint16_t i = 0; i < numSubtables; i++) {
-        const uint8_t* rec = cmap + 4 + i * 8;
-        uint16_t platformID = u16(rec);
-        uint16_t encodingID = u16(rec + 2);
-        uint32_t offset = u32(rec + 4);
-
-        // Prefer Unicode/BMP or Windows/UCS-2 subtables
-        if (!((platformID == 0) || (platformID == 3 && (encodingID == 1 || encodingID == 10)))) continue;
-
-        const uint8_t* sub = cmap + offset;
-        uint16_t format = u16(sub);
-
-        if (format == 4) {
-            uint16_t segCount = u16(sub + 6) / 2;
-            const uint8_t* endCodes = sub + 14;
-            const uint8_t* startCodes = endCodes + segCount * 2 + 2;
-            const uint8_t* idDeltas = startCodes + segCount * 2;
-            const uint8_t* idRangeOffsets = idDeltas + segCount * 2;
-
-            for (uint16_t seg = 0; seg < segCount; seg++) {
-                uint16_t endCode = u16(endCodes + seg * 2);
-                uint16_t startCode = u16(startCodes + seg * 2);
-                int16_t idDelta = s16(idDeltas + seg * 2);
-                uint16_t idRangeOffset = u16(idRangeOffsets + seg * 2);
-
-                if (startCode == 0xFFFF) break;
-
-                for (uint32_t cp = startCode; cp <= endCode; cp++) {
-                    uint16_t gid;
-                    if (idRangeOffset == 0) {
-                        gid = (uint16_t)((cp + idDelta) & 0xFFFF);
-                    } else {
-                        const uint8_t* ptr = idRangeOffsets + seg * 2 + idRangeOffset + (cp - startCode) * 2;
-                        gid = u16(ptr);
-                        if (gid != 0) gid = (uint16_t)((gid + idDelta) & 0xFFFF);
-                    }
-                    if (gid != 0 && glyphToCp.find(gid) == glyphToCp.end()) {
-                        glyphToCp[gid] = cp;
-                    }
-                }
-            }
-            break;  // Use first suitable subtable
-        } else if (format == 12) {
-            uint32_t numGroups = u32(sub + 12);
-            const uint8_t* groups = sub + 16;
-            for (uint32_t g = 0; g < numGroups; g++) {
-                uint32_t startCharCode = u32(groups + g * 12);
-                uint32_t endCharCode = u32(groups + g * 12 + 4);
-                uint32_t startGlyphID = u32(groups + g * 12 + 8);
-                for (uint32_t cp = startCharCode; cp <= endCharCode; cp++) {
-                    uint16_t gid = (uint16_t)(startGlyphID + (cp - startCharCode));
-                    if (gid != 0 && glyphToCp.find(gid) == glyphToCp.end()) {
-                        glyphToCp[gid] = cp;
-                    }
-                }
-            }
-            break;
-        }
-    }
-    return glyphToCp;
-}
-
-// --- Build forward cmap: codepoint -> glyph ID ---
-static std::unordered_map<uint32_t, uint16_t> buildForwardCmap(const uint8_t* font, size_t fontLen) {
     std::unordered_map<uint32_t, uint16_t> cpToGlyph;
+};
+
+static CmapResult buildCmaps(const uint8_t* font, size_t fontLen) {
+    CmapResult result;
     const uint8_t* cmap = findTable(font, fontLen, "cmap");
-    if (!cmap) return cpToGlyph;
+    if (!cmap) return result;
 
     uint16_t numSubtables = u16(cmap + 2);
     for (uint16_t i = 0; i < numSubtables; i++) {
@@ -142,7 +79,10 @@ static std::unordered_map<uint32_t, uint16_t> buildForwardCmap(const uint8_t* fo
                         gid = u16(ptr);
                         if (gid != 0) gid = (uint16_t)((gid + idDelta) & 0xFFFF);
                     }
-                    if (gid != 0) cpToGlyph[cp] = gid;
+                    if (gid != 0) {
+                        result.cpToGlyph[cp] = gid;
+                        result.glyphToCp.emplace(gid, cp);
+                    }
                 }
             }
             break;
@@ -155,13 +95,16 @@ static std::unordered_map<uint32_t, uint16_t> buildForwardCmap(const uint8_t* fo
                 uint32_t startGlyphID = u32(groups + g * 12 + 8);
                 for (uint32_t cp = startCharCode; cp <= endCharCode; cp++) {
                     uint16_t gid = (uint16_t)(startGlyphID + (cp - startCharCode));
-                    if (gid != 0) cpToGlyph[cp] = gid;
+                    if (gid != 0) {
+                        result.cpToGlyph[cp] = gid;
+                        result.glyphToCp.emplace(gid, cp);
+                    }
                 }
             }
             break;
         }
     }
-    return cpToGlyph;
+    return result;
 }
 
 // --- Coverage table lookup ---
@@ -181,13 +124,18 @@ static int coverageLookup(const uint8_t* coverage, uint16_t glyphID) {
         }
     } else if (format == 2) {
         uint16_t rangeCount = u16(coverage + 2);
-        for (uint16_t i = 0; i < rangeCount; i++) {
-            const uint8_t* rr = coverage + 4 + i * 6;
+        int lo = 0, hi = rangeCount - 1;
+        while (lo <= hi) {
+            int mid = (lo + hi) / 2;
+            const uint8_t* rr = coverage + 4 + mid * 6;
             uint16_t startGlyph = u16(rr);
             uint16_t endGlyph = u16(rr + 2);
-            uint16_t startCoverageIndex = u16(rr + 4);
-            if (glyphID >= startGlyph && glyphID <= endGlyph) {
-                return startCoverageIndex + (glyphID - startGlyph);
+            if (glyphID < startGlyph) {
+                hi = mid - 1;
+            } else if (glyphID > endGlyph) {
+                lo = mid + 1;
+            } else {
+                return u16(rr + 4) + (glyphID - startGlyph);
             }
         }
     }
@@ -206,12 +154,19 @@ static uint16_t classDefLookup(const uint8_t* classDef, uint16_t glyphID) {
         }
     } else if (format == 2) {
         uint16_t rangeCount = u16(classDef + 2);
-        for (uint16_t i = 0; i < rangeCount; i++) {
-            const uint8_t* rr = classDef + 4 + i * 6;
+        int lo = 0, hi = rangeCount - 1;
+        while (lo <= hi) {
+            int mid = (lo + hi) / 2;
+            const uint8_t* rr = classDef + 4 + mid * 6;
             uint16_t startGlyph = u16(rr);
             uint16_t endGlyph = u16(rr + 2);
-            uint16_t classValue = u16(rr + 4);
-            if (glyphID >= startGlyph && glyphID <= endGlyph) return classValue;
+            if (glyphID < startGlyph) {
+                hi = mid - 1;
+            } else if (glyphID > endGlyph) {
+                lo = mid + 1;
+            } else {
+                return u16(rr + 4);
+            }
         }
     }
     return 0;
@@ -239,8 +194,8 @@ static int valueRecordSize(uint16_t valueFormat) {
 // --- GPOS PairPos subtable extraction ---
 static void extractPairPosFormat1(const uint8_t* subtable, uint16_t valueFormat1, uint16_t valueFormat2,
                                   const std::unordered_map<uint16_t, uint32_t>& glyphToCp,
-                                  const std::set<uint32_t>& glyphSetLookup,
-                                  std::map<std::pair<uint16_t, uint16_t>, int16_t>& rawKern) {
+                                  const std::unordered_set<uint32_t>& glyphSetLookup,
+                                  std::unordered_map<uint32_t, int16_t>& rawKern) {
     const uint8_t* coverage = subtable + u16(subtable + 2);
     uint16_t pairSetCount = u16(subtable + 8);
     int vr1Size = valueRecordSize(valueFormat1);
@@ -278,7 +233,7 @@ static void extractPairPosFormat1(const uint8_t* subtable, uint16_t valueFormat1
 
         auto fIt = glyphToCp.find(firstGlyph);
         if (fIt == glyphToCp.end()) continue;
-        if (glyphSetLookup.find(fIt->second) == glyphSetLookup.end()) continue;
+        if (glyphSetLookup.count(fIt->second) == 0) continue;
 
         for (uint16_t j = 0; j < pairValueCount; j++) {
             const uint8_t* pvr = pairSet + 2 + j * recordSize;
@@ -288,9 +243,9 @@ static void extractPairPosFormat1(const uint8_t* subtable, uint16_t valueFormat1
             if (xAdv == 0) continue;
             auto sIt = glyphToCp.find(secondGlyph);
             if (sIt == glyphToCp.end()) continue;
-            if (glyphSetLookup.find(sIt->second) == glyphSetLookup.end()) continue;
+            if (glyphSetLookup.count(sIt->second) == 0) continue;
 
-            auto key = std::make_pair(firstGlyph, secondGlyph);
+            uint32_t key = (uint32_t(firstGlyph) << 16) | secondGlyph;
             auto it = rawKern.find(key);
             if (it == rawKern.end() || std::abs(xAdv) > std::abs(it->second)) {
                 rawKern[key] = xAdv;
@@ -302,8 +257,8 @@ static void extractPairPosFormat1(const uint8_t* subtable, uint16_t valueFormat1
 static void extractPairPosFormat2(const uint8_t* subtable, uint16_t valueFormat1, uint16_t valueFormat2,
                                   const std::unordered_map<uint16_t, uint32_t>& glyphToCp,
                                   const std::unordered_map<uint32_t, uint16_t>& cpToGlyph,
-                                  const std::set<uint32_t>& glyphSetLookup,
-                                  std::map<std::pair<uint16_t, uint16_t>, int16_t>& rawKern) {
+                                  const std::unordered_set<uint32_t>& glyphSetLookup,
+                                  std::unordered_map<uint32_t, int16_t>& rawKern) {
     const uint8_t* classDef1 = subtable + u16(subtable + 8);
     const uint8_t* classDef2 = subtable + u16(subtable + 10);
     uint16_t class1Count = u16(subtable + 12);
@@ -315,7 +270,7 @@ static void extractPairPosFormat2(const uint8_t* subtable, uint16_t valueFormat1
     // Build class -> glyph list for classes that contain glyphs in our set
     std::unordered_map<uint16_t, std::vector<uint16_t>> class1Glyphs, class2Glyphs;
     for (const auto& cpGid : cpToGlyph) {
-        if (glyphSetLookup.find(cpGid.first) == glyphSetLookup.end()) continue;
+        if (glyphSetLookup.count(cpGid.first) == 0) continue;
         uint16_t c1 = classDefLookup(classDef1, cpGid.second);
         uint16_t c2 = classDefLookup(classDef2, cpGid.second);
         class1Glyphs[c1].push_back(cpGid.second);
@@ -337,7 +292,7 @@ static void extractPairPosFormat2(const uint8_t* subtable, uint16_t valueFormat1
 
             for (uint16_t g1 : c1It->second) {
                 for (uint16_t g2 : c2It->second) {
-                    auto key = std::make_pair(g1, g2);
+                    uint32_t key = (uint32_t(g1) << 16) | g2;
                     auto it = rawKern.find(key);
                     if (it == rawKern.end() || std::abs(xAdv) > std::abs(it->second)) {
                         rawKern[key] = xAdv;
@@ -354,9 +309,10 @@ static void extractPairPosFormat2(const uint8_t* subtable, uint16_t valueFormat1
 
 std::vector<EpdKernPair> extractKerning(const uint8_t* fontData, size_t fontDataSize, float ppem,
                                         const uint32_t* glyphSet, size_t glyphSetSize) {
-    std::set<uint32_t> glyphSetLookup(glyphSet, glyphSet + glyphSetSize);
-    auto glyphToCp = buildReverseCmap(fontData, fontDataSize);
-    auto cpToGlyph = buildForwardCmap(fontData, fontDataSize);
+    std::unordered_set<uint32_t> glyphSetLookup(glyphSet, glyphSet + glyphSetSize);
+    auto cmaps = buildCmaps(fontData, fontDataSize);
+    auto& glyphToCp = cmaps.glyphToCp;
+    auto& cpToGlyph = cmaps.cpToGlyph;
 
     // Get units_per_em from head table
     const uint8_t* head = findTable(fontData, fontDataSize, "head");
@@ -366,8 +322,8 @@ std::vector<EpdKernPair> extractKerning(const uint8_t* fontData, size_t fontData
 
     float scale = ppem / (float)unitsPerEm;
 
-    // Collect raw kerning in design units: (glyphID_left, glyphID_right) -> du
-    std::map<std::pair<uint16_t, uint16_t>, int16_t> rawKern;
+    // Collect raw kerning in design units: packed (glyphID_left << 16 | glyphID_right) -> du
+    std::unordered_map<uint32_t, int16_t> rawKern;
 
     const uint8_t* gpos = findTable(fontData, fontDataSize, "GPOS");
     if (gpos) {
@@ -436,9 +392,10 @@ std::vector<EpdKernPair> extractKerning(const uint8_t* fontData, size_t fontData
 
     // Scale to pixels and pack
     std::vector<EpdKernPair> pairs;
+    pairs.reserve(rawKern.size());
     for (const auto& kernEntry : rawKern) {
-        auto lIt = glyphToCp.find(kernEntry.first.first);
-        auto rIt = glyphToCp.find(kernEntry.first.second);
+        auto lIt = glyphToCp.find((uint16_t)(kernEntry.first >> 16));
+        auto rIt = glyphToCp.find((uint16_t)(kernEntry.first & 0xFFFF));
         if (lIt == glyphToCp.end() || rIt == glyphToCp.end()) continue;
 
         int adjust = (int)std::floor(kernEntry.second * scale);
@@ -494,8 +451,9 @@ static uint32_t findStandardLigature(const uint32_t* seq, uint8_t seqLen) {
 
 std::vector<EpdLigaturePair> extractLigatures(const uint8_t* fontData, size_t fontDataSize,
                                               const uint32_t* glyphSet, size_t glyphSetSize) {
-    std::set<uint32_t> glyphSetLookup(glyphSet, glyphSet + glyphSetSize);
-    auto glyphToCp = buildReverseCmap(fontData, fontDataSize);
+    std::unordered_set<uint32_t> glyphSetLookup(glyphSet, glyphSet + glyphSetSize);
+    auto cmaps = buildCmaps(fontData, fontDataSize);
+    auto& glyphToCp = cmaps.glyphToCp;
 
     const uint8_t* gsub = findTable(fontData, fontDataSize, "GSUB");
     if (!gsub) return {};
@@ -619,10 +577,10 @@ std::vector<EpdLigaturePair> extractLigatures(const uint8_t* fontData, size_t fo
     // Filter: keep only ligatures where all input and output codepoints are in glyphSet
     std::map<std::vector<uint32_t>, uint32_t> filtered;
     for (const auto& ligEntry : rawLigatures) {
-        if (glyphSetLookup.find(ligEntry.second) == glyphSetLookup.end()) continue;
+        if (glyphSetLookup.count(ligEntry.second) == 0) continue;
         bool allIn = true;
         for (size_t i = 0; i < ligEntry.first.size(); i++) {
-            if (glyphSetLookup.find(ligEntry.first[i]) == glyphSetLookup.end()) { allIn = false; break; }
+            if (glyphSetLookup.count(ligEntry.first[i]) == 0) { allIn = false; break; }
         }
         if (allIn) filtered[ligEntry.first] = ligEntry.second;
     }

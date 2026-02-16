@@ -95,10 +95,8 @@ class FontCache {
     CacheEntry entries[MAX_FONTS];
   };
 
-#ifdef ESP_PLATFORM
   const void* mmapHandle_ = nullptr;
   const void* partitionPtr_ = nullptr;
-#endif
   const uint8_t* mappedBase_ = nullptr;
   size_t partitionSize_ = 0;
   bool initialized_ = false;

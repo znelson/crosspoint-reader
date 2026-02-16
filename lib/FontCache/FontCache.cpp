@@ -4,10 +4,8 @@
 
 #include <cstring>
 
-#ifdef ESP_PLATFORM
 #include <esp_partition.h>
 #include <esp_spi_flash.h>
-#endif
 
 static const char* TAG = "FCACHE";
 
@@ -16,16 +14,13 @@ FontCache::~FontCache() {
         delete f;
     }
     ownedFonts_.clear();
-#ifdef ESP_PLATFORM
     if (mmapHandle_) {
         spi_flash_munmap(static_cast<spi_flash_mmap_handle_t>((uintptr_t)mmapHandle_));
         mmapHandle_ = nullptr;
     }
-#endif
 }
 
 bool FontCache::init() {
-#ifdef ESP_PLATFORM
     const esp_partition_t* part = esp_partition_find_first(
         ESP_PARTITION_TYPE_DATA, static_cast<esp_partition_subtype_t>(0x82), "fontcache");
     if (!part) {
@@ -47,11 +42,6 @@ bool FontCache::init() {
     mmapHandle_ = reinterpret_cast<const void*>((uintptr_t)handle);
     partitionPtr_ = ptr;
     mappedBase_ = static_cast<const uint8_t*>(ptr);
-#else
-    // Desktop testing stub
-    LOG_ERR(TAG, "FontCache only supported on ESP_PLATFORM");
-    return false;
-#endif
 
     initialized_ = true;
     parseHeader();
@@ -88,6 +78,7 @@ void FontCache::rebuildFontData() {
     cachedFonts_.clear();
     if (!mappedBase_) return;
 
+    cachedFonts_.reserve(header_.fontCount);
     for (int i = 0; i < header_.fontCount; i++) {
         const CacheEntry& entry = header_.entries[i];
         CachedFont cf = {};
@@ -124,7 +115,6 @@ size_t FontCache::nextBlobOffset() const {
 
 bool FontCache::cacheFont(int fontId, const uint8_t* ttfPtrs[4], const size_t ttfSizes[4],
                           int pixelSize, ProgressCallback progress) {
-#ifdef ESP_PLATFORM
     if (!initialized_) return false;
 
     const esp_partition_t* part = esp_partition_find_first(
@@ -268,9 +258,6 @@ bool FontCache::cacheFont(int fontId, const uint8_t* ttfPtrs[4], const size_t tt
     if (progress) progress(100);
     LOG_DBG(TAG, "Font %d cached successfully", fontId);
     return true;
-#else
-    return false;
-#endif
 }
 
 const EpdFontData* FontCache::getFont(int fontId, EpdFontFamily::Style style) const {
@@ -284,23 +271,23 @@ const EpdFontData* FontCache::getFont(int fontId, EpdFontFamily::Style style) co
 }
 
 EpdFontFamily FontCache::buildEpdFontFamily(int fontId) {
-    const EpdFontData* regular = getFont(fontId, EpdFontFamily::REGULAR);
-    const EpdFontData* bold = getFont(fontId, EpdFontFamily::BOLD);
-    const EpdFontData* italic = getFont(fontId, EpdFontFamily::ITALIC);
-    const EpdFontData* boldItalic = getFont(fontId, EpdFontFamily::BOLD_ITALIC);
+    // Find the CachedFont once instead of 4 separate linear scans via getFont()
+    const CachedFont* found = nullptr;
+    for (const auto& cf : cachedFonts_) {
+        if (cf.fontId == fontId) {
+            found = &cf;
+            break;
+        }
+    }
 
-    // Create heap-allocated EpdFont objects that we own
-    auto* regFont = regular ? new EpdFont(regular) : nullptr;
-    auto* boldFont = bold ? new EpdFont(bold) : nullptr;
-    auto* italicFont = italic ? new EpdFont(italic) : nullptr;
-    auto* biFont = boldItalic ? new EpdFont(boldItalic) : nullptr;
+    auto makeFont = [&](int styleIdx) -> EpdFont* {
+        if (!found || !found->valid[styleIdx]) return nullptr;
+        auto* f = new EpdFont(&found->styles[styleIdx]);
+        ownedFonts_.push_back(f);
+        return f;
+    };
 
-    if (regFont) ownedFonts_.push_back(regFont);
-    if (boldFont) ownedFonts_.push_back(boldFont);
-    if (italicFont) ownedFonts_.push_back(italicFont);
-    if (biFont) ownedFonts_.push_back(biFont);
-
-    return EpdFontFamily(regFont, boldFont, italicFont, biFont);
+    return EpdFontFamily(makeFont(0), makeFont(1), makeFont(2), makeFont(3));
 }
 
 const uint8_t* FontCache::getStagingBase() const {
@@ -314,7 +301,6 @@ size_t FontCache::getStagingSize() const {
 }
 
 const uint8_t* FontCache::stageToFlash(const uint8_t* data, size_t dataSize) {
-#ifdef ESP_PLATFORM
     if (!initialized_ || !data || dataSize == 0) return nullptr;
 
     const esp_partition_t* part = esp_partition_find_first(
@@ -359,7 +345,4 @@ const uint8_t* FontCache::stageToFlash(const uint8_t* data, size_t dataSize) {
     mappedBase_ = static_cast<const uint8_t*>(ptr);
 
     return mappedBase_ + stagingOffset;
-#else
-    return nullptr;
-#endif
 }
