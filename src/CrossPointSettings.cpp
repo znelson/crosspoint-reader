@@ -308,6 +308,110 @@ int CrossPointSettings::getRefreshFrequency() const {
   }
 }
 
+const char* CrossPointSettings::getReaderFontFamilyName() const {
+  switch (fontFamily) {
+    case BOOKERLY:
+    default:
+      return "Bookerly";
+    case NOTOSANS:
+      return "NotoSans";
+    case OPENDYSLEXIC:
+      return "OpenDyslexic";
+  }
+}
+
+int CrossPointSettings::getReaderPixelSize() const {
+  switch (fontFamily) {
+    case BOOKERLY:
+    default:
+      switch (fontSize) {
+        case SMALL:
+          return 12;
+        case MEDIUM:
+        default:
+          return 14;
+        case LARGE:
+          return 16;
+        case EXTRA_LARGE:
+          return 18;
+      }
+    case NOTOSANS:
+      switch (fontSize) {
+        case SMALL:
+          return 12;
+        case MEDIUM:
+        default:
+          return 14;
+        case LARGE:
+          return 16;
+        case EXTRA_LARGE:
+          return 18;
+      }
+    case OPENDYSLEXIC:
+      switch (fontSize) {
+        case SMALL:
+          return 8;
+        case MEDIUM:
+        default:
+          return 10;
+        case LARGE:
+          return 12;
+        case EXTRA_LARGE:
+          return 14;
+      }
+  }
+}
+
+bool CrossPointSettings::isReaderFontEmbedded() const {
+  return fontFamily == BOOKERLY;
+}
+
+const char* CrossPointSettings::getTtfFilename(FONT_FAMILY family, int style) {
+  switch (family) {
+    case BOOKERLY:
+      switch (style) {
+        case 0:
+        default:
+          return "Bookerly-Regular.ttf";
+        case 1:
+          return "Bookerly-Bold.ttf";
+        case 2:
+          return "Bookerly-Italic.ttf";
+        case 3:
+          return "Bookerly-BoldItalic.ttf";
+      }
+    case NOTOSANS:
+      switch (style) {
+        case 0:
+        default:
+          return "NotoSans-Regular.ttf";
+        case 1:
+          return "NotoSans-Bold.ttf";
+        case 2:
+          return "NotoSans-Italic.ttf";
+        case 3:
+          return "NotoSans-BoldItalic.ttf";
+      }
+    case OPENDYSLEXIC:
+    default:
+      switch (style) {
+        case 0:
+        default:
+          return "OpenDyslexic-Regular.otf";
+        case 1:
+          return "OpenDyslexic-Bold.otf";
+        case 2:
+          return "OpenDyslexic-Italic.otf";
+        case 3:
+          return "OpenDyslexic-BoldItalic.otf";
+      }
+  }
+}
+
+const char* CrossPointSettings::getFontExtension(FONT_FAMILY family) {
+  return (family == OPENDYSLEXIC) ? "otf" : "ttf";
+}
+
 int CrossPointSettings::getReaderFontId() const {
   switch (fontFamily) {
     case BOOKERLY:

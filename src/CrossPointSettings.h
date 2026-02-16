@@ -183,6 +183,22 @@ class CrossPointSettings {
   }
   int getReaderFontId() const;
 
+  /// Returns the font family directory name (e.g., "Bookerly", "NotoSans", "OpenDyslexic").
+  const char* getReaderFontFamilyName() const;
+
+  /// Returns the pixel size that fontconvert.py / FontRasterizer uses for the current fontSize.
+  int getReaderPixelSize() const;
+
+  /// Returns true if the current font family is embedded in the firmware (Bookerly).
+  bool isReaderFontEmbedded() const;
+
+  /// Returns the style-specific TTF filename (e.g., "Bookerly-Regular.ttf").
+  /// @param style 0=regular, 1=bold, 2=italic, 3=bolditalic
+  static const char* getTtfFilename(FONT_FAMILY family, int style);
+
+  /// Returns the file extension for the font family ("ttf" or "otf").
+  static const char* getFontExtension(FONT_FAMILY family);
+
   bool saveToFile() const;
   bool loadFromFile();
 

@@ -151,6 +151,10 @@ class SettingsActivity final : public ActivityWithSubactivity {
   const std::vector<SettingInfo>* currentSettings = nullptr;
 
   const std::function<void()> onGoHome;
+  /// Called when the user changes font family or font size.
+  /// Args: (oldFontId, newFontId). The callback should rasterize/cache the
+  /// new font and register it with the renderer.
+  const std::function<void(int oldFontId, int newFontId)> onFontChanged;
 
   static constexpr int categoryCount = 4;
   static const char* categoryNames[categoryCount];
@@ -163,8 +167,11 @@ class SettingsActivity final : public ActivityWithSubactivity {
 
  public:
   explicit SettingsActivity(GfxRenderer& renderer, MappedInputManager& mappedInput,
-                            const std::function<void()>& onGoHome)
-      : ActivityWithSubactivity("Settings", renderer, mappedInput), onGoHome(onGoHome) {}
+                            const std::function<void()>& onGoHome,
+                            std::function<void(int oldFontId, int newFontId)> onFontChanged = nullptr)
+      : ActivityWithSubactivity("Settings", renderer, mappedInput),
+        onGoHome(onGoHome),
+        onFontChanged(std::move(onFontChanged)) {}
   void onEnter() override;
   void onExit() override;
   void loop() override;

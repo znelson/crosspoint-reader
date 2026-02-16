@@ -166,6 +166,9 @@ void SettingsActivity::toggleCurrentSetting() {
 
   const auto& setting = (*currentSettings)[selectedSetting];
 
+  // Capture old font ID before the setting changes, for cleanup
+  const int oldReaderFontId = SETTINGS.getReaderFontId();
+
   if (setting.type == SettingType::TOGGLE && setting.valuePtr != nullptr) {
     // Toggle the boolean value using the member pointer
     const bool currentValue = SETTINGS.*(setting.valuePtr);
@@ -223,6 +226,18 @@ void SettingsActivity::toggleCurrentSetting() {
     }
   } else {
     return;
+  }
+
+  // If a font-related setting changed, notify the caller to rasterize/swap the font.
+  if (onFontChanged &&
+      (setting.valuePtr == &CrossPointSettings::fontFamily ||
+       setting.valuePtr == &CrossPointSettings::fontSize)) {
+    const int newReaderFontId = SETTINGS.getReaderFontId();
+    if (newReaderFontId != oldReaderFontId) {
+      xSemaphoreTake(renderingMutex, portMAX_DELAY);
+      onFontChanged(oldReaderFontId, newReaderFontId);
+      xSemaphoreGive(renderingMutex);
+    }
   }
 
   SETTINGS.saveToFile();
