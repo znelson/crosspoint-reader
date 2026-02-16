@@ -29,15 +29,16 @@ uint32_t firstCodepoint(const std::string& word) {
   }
 }
 
-// Returns the last codepoint of a word.
+// Returns the last codepoint of a word by scanning backward for the start of the last UTF-8 sequence.
 uint32_t lastCodepoint(const std::string& word) {
-  const auto* ptr = reinterpret_cast<const unsigned char*>(word.c_str());
-  uint32_t last = 0;
-  uint32_t cp;
-  while ((cp = utf8NextCodepoint(&ptr)) != 0) {
-    last = cp;
+  if (word.empty()) return 0;
+  // UTF-8 continuation bytes start with 10xxxxxx; scan backward to find the leading byte.
+  size_t i = word.size() - 1;
+  while (i > 0 && (static_cast<uint8_t>(word[i]) & 0xC0) == 0x80) {
+    --i;
   }
-  return last;
+  const auto* ptr = reinterpret_cast<const unsigned char*>(word.c_str() + i);
+  return utf8NextCodepoint(&ptr);
 }
 
 bool containsSoftHyphen(const std::string& word) { return word.find(SOFT_HYPHEN_UTF8) != std::string::npos; }
