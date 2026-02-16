@@ -86,9 +86,13 @@ std::vector<uint8_t> FontRasterizer::rasterize(const uint8_t* fontData, size_t f
         }
     }
 
-    // Rasterize all glyphs
-    std::vector<uint8_t> bitmapData;
-    bitmapData.reserve(totalCodepoints * std::max(1, (int)(ppem * ppem / 4)));
+    // Build blob in-place: write bitmap data directly into the output blob
+    // instead of accumulating a separate bitmapData vector. This halves peak
+    // memory usage, which is critical on the ESP32-C3's limited SRAM.
+    std::vector<uint8_t> blob;
+    blob.reserve(sizeof(BlobHeader) + totalCodepoints * std::max(1, (int)(ppem * ppem / 4)));
+    blob.resize(sizeof(BlobHeader));  // Placeholder header (filled in at the end)
+
     std::vector<EpdGlyph> glyphs;
     glyphs.reserve(totalCodepoints);
 
@@ -115,24 +119,24 @@ std::vector<uint8_t> FontRasterizer::rasterize(const uint8_t* fontData, size_t f
             g.advanceX = (uint8_t)std::min((int)std::floor(advanceWidth * scale), 255);
             g.left = (int16_t)x0;
             g.top = (int16_t)(-y0);  // epdiy convention: top = baseline to top of glyph (positive up)
-            g.dataOffset = (uint32_t)bitmapData.size();
+            g.dataOffset = (uint32_t)(blob.size() - sizeof(BlobHeader));
 
             if (w > 0 && h > 0 && glyphIndex != 0) {
                 // Render 8-bit alpha bitmap (reuse buffer to avoid allocation)
                 alphaBuffer.resize((size_t)w * h);
                 stbtt_MakeGlyphBitmap(&info, alphaBuffer.data(), w, h, w, scale, scale, glyphIndex);
 
-                // Pack to 2-bit: pre-size output to avoid per-byte push_back
+                // Pack to 2-bit directly into the output blob
                 int packedRowBytes = (w + 3) / 4;
-                size_t bitmapOffset = bitmapData.size();
-                bitmapData.resize(bitmapOffset + (size_t)packedRowBytes * h);
+                size_t bitmapOffset = blob.size();
+                blob.resize(bitmapOffset + (size_t)packedRowBytes * h);
                 for (int row = 0; row < h; row++) {
                     pack2bitRow(alphaBuffer.data() + row * w, w,
-                                bitmapData.data() + bitmapOffset + row * packedRowBytes);
+                                blob.data() + bitmapOffset + row * packedRowBytes);
                 }
             }
 
-            g.dataLength = (uint16_t)((uint32_t)bitmapData.size() - g.dataOffset);
+            g.dataLength = (uint16_t)((uint32_t)(blob.size() - sizeof(BlobHeader)) - g.dataOffset);
             glyphs.push_back(g);
 
             codepointsDone++;
@@ -142,6 +146,11 @@ std::vector<uint8_t> FontRasterizer::rasterize(const uint8_t* fontData, size_t f
             }
         }
     }
+
+    // Release alpha buffer — no longer needed after rasterization
+    { std::vector<uint8_t>().swap(alphaBuffer); }
+
+    uint32_t bitmapSize = (uint32_t)(blob.size() - sizeof(BlobHeader));
 
     if (progress) progress(80);
 
@@ -193,9 +202,38 @@ std::vector<uint8_t> FontRasterizer::rasterize(const uint8_t* fontData, size_t f
 
     if (progress) progress(95);
 
-    // --- Serialize the blob ---
+    // --- Append remaining sections to blob (bitmap data is already in-place) ---
+    {
+        size_t off = blob.size();
+        size_t bytes = glyphs.size() * sizeof(EpdGlyph);
+        blob.resize(off + bytes);
+        memcpy(blob.data() + off, glyphs.data(), bytes);
+    }
+
+    {
+        size_t off = blob.size();
+        size_t bytes = intervals.size() * sizeof(EpdUnicodeInterval);
+        blob.resize(off + bytes);
+        memcpy(blob.data() + off, intervals.data(), bytes);
+    }
+
+    {
+        size_t off = blob.size();
+        size_t bytes = kernPairs.size() * sizeof(EpdKernPair);
+        blob.resize(off + bytes);
+        memcpy(blob.data() + off, kernPairs.data(), bytes);
+    }
+
+    {
+        size_t off = blob.size();
+        size_t bytes = ligPairs.size() * sizeof(EpdLigaturePair);
+        blob.resize(off + bytes);
+        memcpy(blob.data() + off, ligPairs.data(), bytes);
+    }
+
+    // Fill in the header at the start of the blob (written last so sizes are known)
     BlobHeader header = {};
-    header.bitmapSize = (uint32_t)bitmapData.size();
+    header.bitmapSize = bitmapSize;
     header.glyphCount = (uint32_t)glyphs.size();
     header.intervalCount = (uint32_t)intervals.size();
     header.kernPairCount = (uint32_t)kernPairs.size();
@@ -204,33 +242,7 @@ std::vector<uint8_t> FontRasterizer::rasterize(const uint8_t* fontData, size_t f
     header.ascender = scaledAscender;
     header.descender = scaledDescender;
     header.is2Bit = 1;
-
-    size_t totalSize = sizeof(BlobHeader)
-        + bitmapData.size()
-        + glyphs.size() * sizeof(EpdGlyph)
-        + intervals.size() * sizeof(EpdUnicodeInterval)
-        + kernPairs.size() * sizeof(EpdKernPair)
-        + ligPairs.size() * sizeof(EpdLigaturePair);
-
-    std::vector<uint8_t> blob(totalSize);
-    uint8_t* ptr = blob.data();
-
-    memcpy(ptr, &header, sizeof(BlobHeader));
-    ptr += sizeof(BlobHeader);
-
-    memcpy(ptr, bitmapData.data(), bitmapData.size());
-    ptr += bitmapData.size();
-
-    memcpy(ptr, glyphs.data(), glyphs.size() * sizeof(EpdGlyph));
-    ptr += glyphs.size() * sizeof(EpdGlyph);
-
-    memcpy(ptr, intervals.data(), intervals.size() * sizeof(EpdUnicodeInterval));
-    ptr += intervals.size() * sizeof(EpdUnicodeInterval);
-
-    memcpy(ptr, kernPairs.data(), kernPairs.size() * sizeof(EpdKernPair));
-    ptr += kernPairs.size() * sizeof(EpdKernPair);
-
-    memcpy(ptr, ligPairs.data(), ligPairs.size() * sizeof(EpdLigaturePair));
+    memcpy(blob.data(), &header, sizeof(BlobHeader));
 
     if (progress) progress(100);
 
