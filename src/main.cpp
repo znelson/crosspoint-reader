@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <BlePageTurner.h>
 #include <Epub.h>
 #include <GfxRenderer.h>
 #include <HalDisplay.h>
@@ -310,6 +311,14 @@ void setup() {
   UITheme::getInstance().reload();
   ButtonNavigator::setMappedInputManager(mappedInputManager);
 
+  // Initialize BLE page turner if enabled in settings
+  if (SETTINGS.blePageTurnerEnabled) {
+    gpio.blePageTurner.begin();
+    if (strlen(SETTINGS.bleDeviceAddress) > 0) {
+      gpio.blePageTurner.autoConnect(SETTINGS.bleDeviceAddress);
+    }
+  }
+
   switch (gpio.getWakeupReason()) {
     case HalGPIO::WakeupReason::PowerButton:
       // For normal wakeups, verify power button press duration
@@ -363,6 +372,20 @@ void loop() {
   static unsigned long lastMemPrint = 0;
 
   gpio.update();
+
+  // React to BLE page turner enable/disable changes at runtime
+  {
+    const bool bleWanted = SETTINGS.blePageTurnerEnabled;
+    const bool bleRunning = gpio.blePageTurner.getState() != BlePageTurner::State::Disabled;
+    if (bleWanted && !bleRunning) {
+      gpio.blePageTurner.begin();
+      if (strlen(SETTINGS.bleDeviceAddress) > 0) {
+        gpio.blePageTurner.autoConnect(SETTINGS.bleDeviceAddress);
+      }
+    } else if (!bleWanted && bleRunning) {
+      gpio.blePageTurner.end();
+    }
+  }
 
   renderer.setFadingFix(SETTINGS.fadingFix);
 

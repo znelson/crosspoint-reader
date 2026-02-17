@@ -26,6 +26,9 @@ class MappedInputManager {
   // Returns the raw front button index that was pressed this frame (or -1 if none).
   int getPressedFrontButton() const;
 
+  // Access BLE page turner for settings UI
+  BlePageTurner& getBlePageTurner() { return gpio.blePageTurner; }
+
  private:
   HalGPIO& gpio;
 

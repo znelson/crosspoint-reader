@@ -2,6 +2,7 @@
 
 #include <Arduino.h>
 #include <BatteryMonitor.h>
+#include <BlePageTurner.h>
 #include <InputManager.h>
 
 // Display SPI pins (custom pins for XteinkX4, not hardware SPI defaults)
@@ -23,8 +24,15 @@ class HalGPIO {
   InputManager inputMgr;
 #endif
 
+  // BLE virtual button edge detection (mirrors InputManager's approach)
+  uint8_t bleCurrentState = 0;
+  uint8_t blePressedEvents = 0;
+  uint8_t bleReleasedEvents = 0;
+
  public:
   HalGPIO() = default;
+
+  BlePageTurner blePageTurner;
 
   // Start button GPIO and setup SPI for screen and SD card
   void begin();

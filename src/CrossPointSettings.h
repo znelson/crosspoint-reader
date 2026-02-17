@@ -175,6 +175,11 @@ class CrossPointSettings {
   // Use book's embedded CSS styles for EPUB rendering (1 = enabled, 0 = disabled)
   uint8_t embeddedStyle = 1;
 
+  // BLE page turner (0 = disabled, 1 = enabled)
+  uint8_t blePageTurnerEnabled = 0;
+  // Paired BLE device address (e.g. "aa:bb:cc:dd:ee:ff"), empty if none
+  char bleDeviceAddress[18] = "";
+
   ~CrossPointSettings() = default;
 
   // Get singleton instance

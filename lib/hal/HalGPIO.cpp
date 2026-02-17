@@ -9,21 +9,39 @@ void HalGPIO::begin() {
   pinMode(UART0_RXD, INPUT);
 }
 
-void HalGPIO::update() { inputMgr.update(); }
+void HalGPIO::update() {
+  inputMgr.update();
 
-bool HalGPIO::isPressed(uint8_t buttonIndex) const { return inputMgr.isPressed(buttonIndex); }
+  // Process BLE virtual button state with edge detection
+  blePageTurner.update();
+  const uint8_t bleState = blePageTurner.getVirtualButtonState();
+  blePressedEvents = bleState & ~bleCurrentState;
+  bleReleasedEvents = bleCurrentState & ~bleState;
+  bleCurrentState = bleState;
+}
 
-bool HalGPIO::wasPressed(uint8_t buttonIndex) const { return inputMgr.wasPressed(buttonIndex); }
+bool HalGPIO::isPressed(uint8_t buttonIndex) const {
+  return inputMgr.isPressed(buttonIndex) || (bleCurrentState & (1 << buttonIndex));
+}
 
-bool HalGPIO::wasAnyPressed() const { return inputMgr.wasAnyPressed(); }
+bool HalGPIO::wasPressed(uint8_t buttonIndex) const {
+  return inputMgr.wasPressed(buttonIndex) || (blePressedEvents & (1 << buttonIndex));
+}
 
-bool HalGPIO::wasReleased(uint8_t buttonIndex) const { return inputMgr.wasReleased(buttonIndex); }
+bool HalGPIO::wasAnyPressed() const { return inputMgr.wasAnyPressed() || blePressedEvents > 0; }
 
-bool HalGPIO::wasAnyReleased() const { return inputMgr.wasAnyReleased(); }
+bool HalGPIO::wasReleased(uint8_t buttonIndex) const {
+  return inputMgr.wasReleased(buttonIndex) || (bleReleasedEvents & (1 << buttonIndex));
+}
+
+bool HalGPIO::wasAnyReleased() const { return inputMgr.wasAnyReleased() || bleReleasedEvents > 0; }
 
 unsigned long HalGPIO::getHeldTime() const { return inputMgr.getHeldTime(); }
 
 void HalGPIO::startDeepSleep() {
+  // Shut down BLE before sleeping to avoid power drain
+  blePageTurner.end();
+
   // Ensure that the power button has been released to avoid immediately turning back on if you're holding it
   while (inputMgr.isPressed(BTN_POWER)) {
     delay(50);
