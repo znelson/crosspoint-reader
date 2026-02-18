@@ -8,9 +8,9 @@
 
 // ── On-flash structs (must match fontconvert.py v2 exactly) ─────────────────
 
-static constexpr uint32_t PARTITION_MAGIC   = 0x43504654;  // "CPFT"
+static constexpr uint32_t PARTITION_MAGIC = 0x43504654;  // "CPFT"
 static constexpr uint32_t PARTITION_VERSION = 2;
-static constexpr uint8_t  PARTITION_SUBTYPE = 0x40;
+static constexpr uint8_t PARTITION_SUBTYPE = 0x40;
 
 struct __attribute__((packed)) PartitionHeader {
   uint32_t magic;
@@ -21,24 +21,24 @@ struct __attribute__((packed)) PartitionHeader {
 };
 
 struct __attribute__((packed)) GroupDirectoryEntry {
-  char     name[16];
+  char name[16];
   uint32_t dataOffset;
   uint32_t dataSize;
 };
 
 struct __attribute__((packed)) FontDirectoryEntry {
-  char     name[32];
+  char name[32];
   uint32_t bitmapOffset;
   uint32_t bitmapSize;
   uint32_t glyphOffset;
   uint32_t glyphCount;
   uint32_t intervalOffset;
   uint32_t intervalCount;
-  uint8_t  advanceY;
-  uint8_t  is2Bit;
-  uint8_t  _pad[2];
-  int32_t  ascender;
-  int32_t  descender;
+  uint8_t advanceY;
+  uint8_t is2Bit;
+  uint8_t _pad[2];
+  int32_t ascender;
+  int32_t descender;
 };
 
 static_assert(sizeof(GroupDirectoryEntry) == 24, "GroupDirectoryEntry must be 24 bytes");
@@ -46,27 +46,27 @@ static_assert(sizeof(FontDirectoryEntry) == 68, "FontDirectoryEntry must be 68 b
 
 // ── Runtime state ───────────────────────────────────────────────────────────
 
-static const esp_partition_t*   partition = nullptr;
+static const esp_partition_t* partition = nullptr;
 
 // Directories read into RAM (small — a few KB)
-static PartitionHeader          hdr;
-static GroupDirectoryEntry*     groupDir = nullptr;
-static FontDirectoryEntry*      fontDir  = nullptr;
+static PartitionHeader hdr;
+static GroupDirectoryEntry* groupDir = nullptr;
+static FontDirectoryEntry* fontDir = nullptr;
 
 // Per-font runtime data (pointers into mapped memory, or nullptr if unmapped)
-static EpdFontData*             fontDataArray = nullptr;
-static EpdFont**                fontArray = nullptr;
-static int                      numFonts = 0;
+static EpdFontData* fontDataArray = nullptr;
+static EpdFont** fontArray = nullptr;
+static int numFonts = 0;
 
 // UI group mmap (always active)
-static spi_flash_mmap_handle_t  uiMmapHandle = 0;
-static const uint8_t*           uiBase = nullptr;
-static int                      uiGroupIndex = -1;
+static spi_flash_mmap_handle_t uiMmapHandle = 0;
+static const uint8_t* uiBase = nullptr;
+static int uiGroupIndex = -1;
 
 // Reader group mmap (swappable)
-static spi_flash_mmap_handle_t  readerMmapHandle = 0;
-static const uint8_t*           readerBase = nullptr;
-static int                      readerGroupIndex = -1;
+static spi_flash_mmap_handle_t readerMmapHandle = 0;
+static const uint8_t* readerBase = nullptr;
+static int readerGroupIndex = -1;
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -83,7 +83,7 @@ static int fontGroupIndex(int fontIdx) {
   const uint32_t off = fontDir[fontIdx].bitmapOffset;
   for (uint32_t g = 0; g < hdr.groupCount; g++) {
     const uint32_t gStart = groupDir[g].dataOffset;
-    const uint32_t gEnd   = gStart + groupDir[g].dataSize;
+    const uint32_t gEnd = gStart + groupDir[g].dataSize;
     if (off >= gStart && off < gEnd) return static_cast<int>(g);
   }
   return -1;
@@ -97,14 +97,14 @@ static void buildFontData(int groupIdx, const uint8_t* base) {
     if (fontGroupIndex(i) != groupIdx) continue;
     const auto& e = fontDir[i];
     fontDataArray[i] = {
-        .bitmap        = base + (e.bitmapOffset - gStart),
-        .glyph         = reinterpret_cast<const EpdGlyph*>(base + (e.glyphOffset - gStart)),
-        .intervals     = reinterpret_cast<const EpdUnicodeInterval*>(base + (e.intervalOffset - gStart)),
+        .bitmap = base + (e.bitmapOffset - gStart),
+        .glyph = reinterpret_cast<const EpdGlyph*>(base + (e.glyphOffset - gStart)),
+        .intervals = reinterpret_cast<const EpdUnicodeInterval*>(base + (e.intervalOffset - gStart)),
         .intervalCount = e.intervalCount,
-        .advanceY      = e.advanceY,
-        .ascender      = e.ascender,
-        .descender     = e.descender,
-        .is2Bit        = e.is2Bit != 0,
+        .advanceY = e.advanceY,
+        .ascender = e.ascender,
+        .descender = e.descender,
+        .is2Bit = e.is2Bit != 0,
     };
   }
 }
@@ -120,10 +120,8 @@ static void clearFontData(int groupIdx) {
 // ── Public API ──────────────────────────────────────────────────────────────
 
 bool FontPartition::begin() {
-  partition = esp_partition_find_first(
-      ESP_PARTITION_TYPE_DATA,
-      static_cast<esp_partition_subtype_t>(PARTITION_SUBTYPE),
-      "fontdata");
+  partition = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, static_cast<esp_partition_subtype_t>(PARTITION_SUBTYPE),
+                                       "fontdata");
 
   if (!partition) {
     LOG_ERR("FONT", "fontdata partition not found");
@@ -185,8 +183,7 @@ bool FontPartition::begin() {
 
   const auto& uiGroup = groupDir[uiGroupIndex];
   const void* ptr = nullptr;
-  err = esp_partition_mmap(partition, uiGroup.dataOffset, uiGroup.dataSize,
-                           SPI_FLASH_MMAP_DATA, &ptr, &uiMmapHandle);
+  err = esp_partition_mmap(partition, uiGroup.dataOffset, uiGroup.dataSize, SPI_FLASH_MMAP_DATA, &ptr, &uiMmapHandle);
   if (err != ESP_OK) {
     LOG_ERR("FONT", "Failed to mmap ui group: %s", esp_err_to_name(err));
     return false;
@@ -194,8 +191,7 @@ bool FontPartition::begin() {
   uiBase = static_cast<const uint8_t*>(ptr);
   buildFontData(uiGroupIndex, uiBase);
 
-  LOG_DBG("FONT", "Loaded %d fonts, %u groups. UI mapped: %u KB",
-          numFonts, hdr.groupCount, uiGroup.dataSize / 1024);
+  LOG_DBG("FONT", "Loaded %d fonts, %u groups. UI mapped: %u KB", numFonts, hdr.groupCount, uiGroup.dataSize / 1024);
   return true;
 }
 
@@ -222,8 +218,8 @@ bool FontPartition::loadReaderGroup(const char* groupName) {
   // Map new reader group
   const auto& group = groupDir[idx];
   const void* ptr = nullptr;
-  esp_err_t err = esp_partition_mmap(partition, group.dataOffset, group.dataSize,
-                                     SPI_FLASH_MMAP_DATA, &ptr, &readerMmapHandle);
+  esp_err_t err =
+      esp_partition_mmap(partition, group.dataOffset, group.dataSize, SPI_FLASH_MMAP_DATA, &ptr, &readerMmapHandle);
   if (err != ESP_OK) {
     LOG_ERR("FONT", "Failed to mmap reader group '%s': %s", groupName, esp_err_to_name(err));
     return false;

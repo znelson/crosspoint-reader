@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <Epub.h>
+#include <FontPartition.h>
 #include <GfxRenderer.h>
 #include <HalDisplay.h>
 #include <HalGPIO.h>
@@ -7,7 +8,6 @@
 #include <I18n.h>
 #include <Logging.h>
 #include <SPI.h>
-#include <FontPartition.h>
 
 #include <cstring>
 
@@ -38,20 +38,22 @@ GfxRenderer renderer(display);
 Activity* currentActivity;
 
 // Font helpers — stable EpdFont pointers from FontPartition, no heap allocation
-static EpdFontFamily makeFontFamily(const char* regular, const char* bold = nullptr,
-                                    const char* italic = nullptr, const char* boldItalic = nullptr) {
-  return EpdFontFamily(FontPartition::getEpdFont(regular),
-                       bold ? FontPartition::getEpdFont(bold) : nullptr,
+static EpdFontFamily makeFontFamily(const char* regular, const char* bold = nullptr, const char* italic = nullptr,
+                                    const char* boldItalic = nullptr) {
+  return EpdFontFamily(FontPartition::getEpdFont(regular), bold ? FontPartition::getEpdFont(bold) : nullptr,
                        italic ? FontPartition::getEpdFont(italic) : nullptr,
                        boldItalic ? FontPartition::getEpdFont(boldItalic) : nullptr);
 }
 
 static const char* fontGroupForFamily(uint8_t family) {
   switch (family) {
-    case CrossPointSettings::NOTOSANS:      return "notosans";
-    case CrossPointSettings::OPENDYSLEXIC:  return "opendyslexic";
+    case CrossPointSettings::NOTOSANS:
+      return "notosans";
+    case CrossPointSettings::OPENDYSLEXIC:
+      return "opendyslexic";
     case CrossPointSettings::BOOKERLY:
-    default:                                return "bookerly";
+    default:
+      return "bookerly";
   }
 }
 
@@ -207,32 +209,32 @@ void setupDisplayAndFonts() {
   renderer.insertFont(SMALL_FONT_ID, makeFontFamily("notosans_8_regular"));
 
   // Reader fonts — all registered once; underlying data reflects mmap state automatically
-  renderer.insertFont(BOOKERLY_12_FONT_ID,
-      makeFontFamily("bookerly_12_regular", "bookerly_12_bold", "bookerly_12_italic", "bookerly_12_bolditalic"));
-  renderer.insertFont(BOOKERLY_14_FONT_ID,
-      makeFontFamily("bookerly_14_regular", "bookerly_14_bold", "bookerly_14_italic", "bookerly_14_bolditalic"));
-  renderer.insertFont(BOOKERLY_16_FONT_ID,
-      makeFontFamily("bookerly_16_regular", "bookerly_16_bold", "bookerly_16_italic", "bookerly_16_bolditalic"));
-  renderer.insertFont(BOOKERLY_18_FONT_ID,
-      makeFontFamily("bookerly_18_regular", "bookerly_18_bold", "bookerly_18_italic", "bookerly_18_bolditalic"));
+  renderer.insertFont(BOOKERLY_12_FONT_ID, makeFontFamily("bookerly_12_regular", "bookerly_12_bold",
+                                                          "bookerly_12_italic", "bookerly_12_bolditalic"));
+  renderer.insertFont(BOOKERLY_14_FONT_ID, makeFontFamily("bookerly_14_regular", "bookerly_14_bold",
+                                                          "bookerly_14_italic", "bookerly_14_bolditalic"));
+  renderer.insertFont(BOOKERLY_16_FONT_ID, makeFontFamily("bookerly_16_regular", "bookerly_16_bold",
+                                                          "bookerly_16_italic", "bookerly_16_bolditalic"));
+  renderer.insertFont(BOOKERLY_18_FONT_ID, makeFontFamily("bookerly_18_regular", "bookerly_18_bold",
+                                                          "bookerly_18_italic", "bookerly_18_bolditalic"));
 
-  renderer.insertFont(NOTOSANS_12_FONT_ID,
-      makeFontFamily("notosans_12_regular", "notosans_12_bold", "notosans_12_italic", "notosans_12_bolditalic"));
-  renderer.insertFont(NOTOSANS_14_FONT_ID,
-      makeFontFamily("notosans_14_regular", "notosans_14_bold", "notosans_14_italic", "notosans_14_bolditalic"));
-  renderer.insertFont(NOTOSANS_16_FONT_ID,
-      makeFontFamily("notosans_16_regular", "notosans_16_bold", "notosans_16_italic", "notosans_16_bolditalic"));
-  renderer.insertFont(NOTOSANS_18_FONT_ID,
-      makeFontFamily("notosans_18_regular", "notosans_18_bold", "notosans_18_italic", "notosans_18_bolditalic"));
+  renderer.insertFont(NOTOSANS_12_FONT_ID, makeFontFamily("notosans_12_regular", "notosans_12_bold",
+                                                          "notosans_12_italic", "notosans_12_bolditalic"));
+  renderer.insertFont(NOTOSANS_14_FONT_ID, makeFontFamily("notosans_14_regular", "notosans_14_bold",
+                                                          "notosans_14_italic", "notosans_14_bolditalic"));
+  renderer.insertFont(NOTOSANS_16_FONT_ID, makeFontFamily("notosans_16_regular", "notosans_16_bold",
+                                                          "notosans_16_italic", "notosans_16_bolditalic"));
+  renderer.insertFont(NOTOSANS_18_FONT_ID, makeFontFamily("notosans_18_regular", "notosans_18_bold",
+                                                          "notosans_18_italic", "notosans_18_bolditalic"));
 
-  renderer.insertFont(OPENDYSLEXIC_8_FONT_ID,
-      makeFontFamily("opendyslexic_8_regular", "opendyslexic_8_bold", "opendyslexic_8_italic", "opendyslexic_8_bolditalic"));
-  renderer.insertFont(OPENDYSLEXIC_10_FONT_ID,
-      makeFontFamily("opendyslexic_10_regular", "opendyslexic_10_bold", "opendyslexic_10_italic", "opendyslexic_10_bolditalic"));
-  renderer.insertFont(OPENDYSLEXIC_12_FONT_ID,
-      makeFontFamily("opendyslexic_12_regular", "opendyslexic_12_bold", "opendyslexic_12_italic", "opendyslexic_12_bolditalic"));
-  renderer.insertFont(OPENDYSLEXIC_14_FONT_ID,
-      makeFontFamily("opendyslexic_14_regular", "opendyslexic_14_bold", "opendyslexic_14_italic", "opendyslexic_14_bolditalic"));
+  renderer.insertFont(OPENDYSLEXIC_8_FONT_ID, makeFontFamily("opendyslexic_8_regular", "opendyslexic_8_bold",
+                                                             "opendyslexic_8_italic", "opendyslexic_8_bolditalic"));
+  renderer.insertFont(OPENDYSLEXIC_10_FONT_ID, makeFontFamily("opendyslexic_10_regular", "opendyslexic_10_bold",
+                                                              "opendyslexic_10_italic", "opendyslexic_10_bolditalic"));
+  renderer.insertFont(OPENDYSLEXIC_12_FONT_ID, makeFontFamily("opendyslexic_12_regular", "opendyslexic_12_bold",
+                                                              "opendyslexic_12_italic", "opendyslexic_12_bolditalic"));
+  renderer.insertFont(OPENDYSLEXIC_14_FONT_ID, makeFontFamily("opendyslexic_14_regular", "opendyslexic_14_bold",
+                                                              "opendyslexic_14_italic", "opendyslexic_14_bolditalic"));
 
   LOG_DBG("MAIN", "Fonts setup (%d fonts)", FontPartition::fontCount());
 }
