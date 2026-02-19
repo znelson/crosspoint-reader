@@ -49,7 +49,7 @@ void WifiSelectionActivity::onEnter() {
 
   // Attempt to auto-connect to the last network
   if (allowAutoConnect) {
-    const std::string lastSsid = WIFI_STORE.getLastConnectedSsid();
+    const auto& lastSsid = WIFI_STORE.getLastConnectedSsid();
     if (!lastSsid.empty()) {
       const auto* cred = WIFI_STORE.findCredential(lastSsid);
       if (cred) {

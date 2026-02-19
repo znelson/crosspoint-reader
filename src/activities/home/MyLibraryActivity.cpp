@@ -188,7 +188,7 @@ void MyLibraryActivity::loop() {
   });
 }
 
-std::string getFileName(std::string filename) {
+std::string getFileName(const std::string& filename) {
   if (filename.back() == '/') {
     return filename.substr(0, filename.length() - 1);
   }
