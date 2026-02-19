@@ -423,9 +423,9 @@ void LyraTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect, const std:
   // Draw cover image as background if available (inside the box)
   // Only load from SD on first render, then use stored buffer
   if (hasContinueReading) {
-    RecentBook book = recentBooks[0];
+    const auto& book = recentBooks[0];
     if (!coverRendered) {
-      const std::string& coverPath = book.coverBmpPath;
+      const auto& coverPath = book.coverBmpPath;
       bool hasCover = true;
       int tileX = LyraMetrics::values.contentSidePadding;
       if (coverPath.empty()) {
