@@ -537,10 +537,10 @@ void LyraTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect, const std:
     }
     if (!currentLine.empty() && titleLines.size() < 3) titleLines.push_back(currentLine);
 
-    auto author = renderer.truncatedText(UI_10_FONT_ID, book.author.c_str(), textWidth);
+    const auto author = renderer.truncatedText(UI_10_FONT_ID, book.author.c_str(), textWidth);
     const int titleLineHeight = renderer.getLineHeight(UI_12_FONT_ID);
     const int titleBlockHeight = titleLineHeight * static_cast<int>(titleLines.size());
-    const int authorHeight = book.author.empty() ? 0 : (renderer.getLineHeight(UI_10_FONT_ID) * 3 / 2);
+    const int authorHeight = author.empty() ? 0 : (renderer.getLineHeight(UI_10_FONT_ID) * 3 / 2);
     const int totalBlockHeight = titleBlockHeight + authorHeight;
     int titleY = tileY + tileHeight / 2 - totalBlockHeight / 2;
     const int textX = tileX + hPaddingInSelection + coverWidth + LyraMetrics::values.verticalSpacing;
@@ -548,7 +548,7 @@ void LyraTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect, const std:
       renderer.drawText(UI_12_FONT_ID, textX, titleY, line.c_str(), true, EpdFontFamily::BOLD);
       titleY += titleLineHeight;
     }
-    if (!book.author.empty()) {
+    if (!author.empty()) {
       titleY += renderer.getLineHeight(UI_10_FONT_ID) / 2;
       renderer.drawText(UI_10_FONT_ID, textX, titleY, author.c_str(), true);
     }
