@@ -57,9 +57,9 @@ void Section::writeSectionFileHeader(const int fontId, const float lineCompressi
   serialization::writePod(file, viewportHeight);
   serialization::writePod(file, hyphenationEnabled);
   serialization::writePod(file, embeddedStyle);
-  serialization::writePod(file, pageCount);                  // Placeholder (patched at end)
-  serialization::writePod(file, static_cast<uint32_t>(0));   // Placeholder for LUT offset
-  serialization::writePod(file, static_cast<uint32_t>(0));   // Placeholder for anchor map offset
+  serialization::writePod(file, pageCount);                 // Placeholder (patched at end)
+  serialization::writePod(file, static_cast<uint32_t>(0));  // Placeholder for LUT offset
+  serialization::writePod(file, static_cast<uint32_t>(0));  // Placeholder for anchor map offset
 }
 
 bool Section::loadSectionFile(const int fontId, const float lineCompression, const bool extraParagraphSpacing,
