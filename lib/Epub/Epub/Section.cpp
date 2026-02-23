@@ -4,16 +4,18 @@
 #include <Logging.h>
 #include <Serialization.h>
 
+#include <algorithm>
+
 #include "Epub/css/CssParser.h"
 #include "Page.h"
 #include "hyphenation/Hyphenator.h"
 #include "parsers/ChapterHtmlSlimParser.h"
 
 namespace {
-constexpr uint8_t SECTION_FILE_VERSION = 13;
+constexpr uint8_t SECTION_FILE_VERSION = 14;
 constexpr uint32_t HEADER_SIZE = sizeof(uint8_t) + sizeof(int) + sizeof(float) + sizeof(bool) + sizeof(uint8_t) +
                                  sizeof(uint16_t) + sizeof(uint16_t) + sizeof(uint16_t) + sizeof(bool) + sizeof(bool) +
-                                 sizeof(uint32_t);
+                                 sizeof(uint32_t) + sizeof(uint32_t);
 }  // namespace
 
 uint32_t Section::onPageComplete(std::unique_ptr<Page> page) {
@@ -44,7 +46,7 @@ void Section::writeSectionFileHeader(const int fontId, const float lineCompressi
   static_assert(HEADER_SIZE == sizeof(SECTION_FILE_VERSION) + sizeof(fontId) + sizeof(lineCompression) +
                                    sizeof(extraParagraphSpacing) + sizeof(paragraphAlignment) + sizeof(viewportWidth) +
                                    sizeof(viewportHeight) + sizeof(pageCount) + sizeof(hyphenationEnabled) +
-                                   sizeof(embeddedStyle) + sizeof(uint32_t),
+                                   sizeof(embeddedStyle) + sizeof(uint32_t) + sizeof(uint32_t),
                 "Header size mismatch");
   serialization::writePod(file, SECTION_FILE_VERSION);
   serialization::writePod(file, fontId);
@@ -55,8 +57,9 @@ void Section::writeSectionFileHeader(const int fontId, const float lineCompressi
   serialization::writePod(file, viewportHeight);
   serialization::writePod(file, hyphenationEnabled);
   serialization::writePod(file, embeddedStyle);
-  serialization::writePod(file, pageCount);  // Placeholder for page count (will be initially 0 when written)
-  serialization::writePod(file, static_cast<uint32_t>(0));  // Placeholder for LUT offset
+  serialization::writePod(file, pageCount);                  // Placeholder (patched at end)
+  serialization::writePod(file, static_cast<uint32_t>(0));   // Placeholder for LUT offset
+  serialization::writePod(file, static_cast<uint32_t>(0));   // Placeholder for anchor map offset
 }
 
 bool Section::loadSectionFile(const int fontId, const float lineCompression, const bool extraParagraphSpacing,
@@ -234,10 +237,22 @@ bool Section::createSectionFile(const int fontId, const float lineCompression, c
     return false;
   }
 
-  // Go back and write LUT offset
-  file.seek(HEADER_SIZE - sizeof(uint32_t) - sizeof(pageCount));
+  // Write anchor-to-page map for TOC fragment navigation
+  const uint32_t anchorMapOffset = file.position();
+  {
+    const auto& anchorMap = visitor.getAnchorPageMap();
+    serialization::writePod(file, static_cast<uint16_t>(anchorMap.size()));
+    for (const auto& pair : anchorMap) {
+      serialization::writeString(file, pair.first);
+      serialization::writePod(file, pair.second);
+    }
+  }
+
+  // Patch header with final pageCount, lutOffset, and anchorMapOffset
+  file.seek(HEADER_SIZE - sizeof(uint32_t) * 2 - sizeof(pageCount));
   serialization::writePod(file, pageCount);
   serialization::writePod(file, lutOffset);
+  serialization::writePod(file, anchorMapOffset);
   file.close();
   if (cssParser) {
     cssParser->clear();
@@ -250,7 +265,7 @@ std::unique_ptr<Page> Section::loadPageFromSectionFile() {
     return nullptr;
   }
 
-  file.seek(HEADER_SIZE - sizeof(uint32_t));
+  file.seek(HEADER_SIZE - sizeof(uint32_t) * 2);
   uint32_t lutOffset;
   serialization::readPod(file, lutOffset);
   file.seek(lutOffset + sizeof(uint32_t) * currentPage);
@@ -261,4 +276,108 @@ std::unique_ptr<Page> Section::loadPageFromSectionFile() {
   auto page = Page::deserialize(file);
   file.close();
   return page;
+}
+
+int Section::getPageForAnchor(const std::string& cachePath, const int spineIndex, const std::string& anchor) {
+  if (anchor.empty()) {
+    return -1;
+  }
+
+  FsFile f;
+  const auto path = cachePath + "/sections/" + std::to_string(spineIndex) + ".bin";
+  if (!Storage.openFileForRead("SCT", path, f)) {
+    return -1;
+  }
+
+  f.seek(HEADER_SIZE - sizeof(uint32_t));
+  uint32_t anchorMapOffset;
+  serialization::readPod(f, anchorMapOffset);
+  if (anchorMapOffset == 0) {
+    f.close();
+    return -1;
+  }
+
+  f.seek(anchorMapOffset);
+  uint16_t count;
+  serialization::readPod(f, count);
+  for (uint16_t i = 0; i < count; i++) {
+    std::string key;
+    uint16_t page;
+    serialization::readString(f, key);
+    serialization::readPod(f, page);
+    if (key == anchor) {
+      f.close();
+      return static_cast<int>(page);
+    }
+  }
+
+  f.close();
+  return -1;
+}
+
+void Section::loadTocBoundaries() {
+  if (tocBoundariesLoaded) return;
+  tocBoundariesLoaded = true;
+
+  const int startTocIndex = epub->getTocIndexForSpineIndex(spineIndex);
+  if (startTocIndex < 0) return;
+
+  // Load anchor map from the section file
+  std::map<std::string, uint16_t> anchorMap;
+  {
+    FsFile f;
+    if (Storage.openFileForRead("SCT", filePath, f)) {
+      f.seek(HEADER_SIZE - sizeof(uint32_t));
+      uint32_t anchorMapOffset;
+      serialization::readPod(f, anchorMapOffset);
+      if (anchorMapOffset > 0) {
+        f.seek(anchorMapOffset);
+        uint16_t count;
+        serialization::readPod(f, count);
+        for (uint16_t i = 0; i < count; i++) {
+          std::string key;
+          uint16_t page;
+          serialization::readString(f, key);
+          serialization::readPod(f, page);
+          anchorMap[key] = page;
+        }
+      }
+      f.close();
+    }
+  }
+
+  // Scan forward from the spine's primary TOC index to collect all entries for this spine
+  const int tocCount = epub->getTocItemsCount();
+  for (int i = startTocIndex; i < tocCount; i++) {
+    const auto entry = epub->getTocItem(i);
+    if (entry.spineIndex != spineIndex) break;
+
+    uint16_t page = 0;
+    if (!entry.anchor.empty()) {
+      auto it = anchorMap.find(entry.anchor);
+      if (it != anchorMap.end()) {
+        page = it->second;
+      }
+    }
+    tocBoundaries.push_back({i, page});
+  }
+
+  std::sort(tocBoundaries.begin(), tocBoundaries.end(),
+            [](const TocBoundary& a, const TocBoundary& b) { return a.startPage < b.startPage; });
+}
+
+int Section::getTocIndexForPage(const int page) const {
+  if (tocBoundaries.empty()) {
+    return epub->getTocIndexForSpineIndex(spineIndex);
+  }
+
+  int result = tocBoundaries[0].tocIndex;
+  for (const auto& boundary : tocBoundaries) {
+    if (boundary.startPage <= static_cast<uint16_t>(page)) {
+      result = boundary.tocIndex;
+    } else {
+      break;
+    }
+  }
+  return result;
 }

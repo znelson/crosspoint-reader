@@ -222,12 +222,41 @@ void EpubReaderActivity::loop() {
   const bool skipChapter = SETTINGS.longPressChapterSkip && mappedInput.getHeldTime() > skipChapterMs;
 
   if (skipChapter) {
-    // We don't want to delete the section mid-render, so grab the semaphore
     {
       RenderLock lock(*this);
-      nextPageNumber = 0;
-      currentSpineIndex = nextTriggered ? currentSpineIndex + 1 : currentSpineIndex - 1;
-      section.reset();
+
+      if (section && section->pageCount > 0) {
+        section->loadTocBoundaries();
+        const int curTocIndex = section->getTocIndexForPage(section->currentPage);
+        const int nextTocIndex = nextTriggered ? curTocIndex + 1 : curTocIndex - 1;
+
+        if (nextTocIndex >= 0 && nextTocIndex < epub->getTocItemsCount()) {
+          const int newSpineIndex = epub->getSpineIndexForTocIndex(nextTocIndex);
+          const auto anchor = epub->getAnchorForTocIndex(nextTocIndex);
+          int targetPage = 0;
+          if (!anchor.empty()) {
+            const int resolved = epub->getPageForAnchor(newSpineIndex, anchor);
+            if (resolved >= 0) targetPage = resolved;
+          }
+
+          if (newSpineIndex == currentSpineIndex) {
+            section->currentPage = targetPage;
+          } else {
+            nextPageNumber = targetPage;
+            currentSpineIndex = newSpineIndex;
+            section.reset();
+          }
+        } else {
+          // Beyond TOC bounds — fall back to spine-level skip
+          nextPageNumber = 0;
+          currentSpineIndex = nextTriggered ? currentSpineIndex + 1 : currentSpineIndex - 1;
+          section.reset();
+        }
+      } else {
+        nextPageNumber = 0;
+        currentSpineIndex = nextTriggered ? currentSpineIndex + 1 : currentSpineIndex - 1;
+        section.reset();
+      }
     }
     requestUpdate();
     return;
@@ -590,6 +619,8 @@ void EpubReaderActivity::render(Activity::RenderLock&& lock) {
       section->currentPage = newPage;
       pendingPercentJump = false;
     }
+
+    section->loadTocBoundaries();
   }
 
   renderer.clearScreen();
@@ -792,7 +823,8 @@ void EpubReaderActivity::renderStatusBar(const int orientedMarginRight, const in
     // available space.
     int titleMarginLeftAdjusted = std::max(titleMarginLeft, titleMarginRight);
     int availableTitleSpace = rendererableScreenWidth - 2 * titleMarginLeftAdjusted;
-    const int tocIndex = epub->getTocIndexForSpineIndex(currentSpineIndex);
+    const int tocIndex =
+        section ? section->getTocIndexForPage(section->currentPage) : epub->getTocIndexForSpineIndex(currentSpineIndex);
 
     std::string title;
     int titleWidth;

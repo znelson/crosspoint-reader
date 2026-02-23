@@ -4,7 +4,9 @@
 
 #include <climits>
 #include <functional>
+#include <map>
 #include <memory>
+#include <string>
 
 #include "../ParsedText.h"
 #include "../blocks/ImageBlock.h"
@@ -66,6 +68,10 @@ class ChapterHtmlSlimParser {
   int tableRowIndex = 0;
   int tableColIndex = 0;
 
+  // Anchor-to-page mapping: tracks which page each HTML id attribute lands on
+  int completedPageCount = 0;
+  std::map<std::string, uint16_t> anchorPageMap;
+
   void updateEffectiveInlineStyle();
   void startNewTextBlock(const BlockStyle& blockStyle);
   void flushPartWordBuffer();
@@ -106,4 +112,5 @@ class ChapterHtmlSlimParser {
   ~ChapterHtmlSlimParser() = default;
   bool parseAndBuildPages();
   void addLineToPage(std::shared_ptr<TextBlock> line);
+  const std::map<std::string, uint16_t>& getAnchorPageMap() const { return anchorPageMap; }
 };

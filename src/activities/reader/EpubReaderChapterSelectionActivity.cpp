@@ -57,6 +57,14 @@ void EpubReaderChapterSelectionActivity::loop() {
     if (newSpineIndex == -1) {
       onGoBack();
     } else {
+      const auto anchor = epub->getAnchorForTocIndex(selectorIndex);
+      if (!anchor.empty()) {
+        const int anchorPage = epub->getPageForAnchor(newSpineIndex, anchor);
+        if (anchorPage >= 0) {
+          onSyncPosition(newSpineIndex, anchorPage);
+          return;
+        }
+      }
       onSelectSpineIndex(newSpineIndex);
     }
   } else if (mappedInput.wasReleased(MappedInputManager::Button::Back)) {

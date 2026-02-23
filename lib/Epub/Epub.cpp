@@ -7,6 +7,7 @@
 #include <PngToBmpConverter.h>
 #include <ZipFile.h>
 
+#include "Epub/Section.h"
 #include "Epub/parsers/ContainerParser.h"
 #include "Epub/parsers/ContentOpfParser.h"
 #include "Epub/parsers/TocNavParser.h"
@@ -807,6 +808,20 @@ int Epub::getSpineIndexForTocIndex(const int tocIndex) const {
   }
 
   return spineIndex;
+}
+
+std::string Epub::getAnchorForTocIndex(const int tocIndex) const {
+  if (!bookMetadataCache || !bookMetadataCache->isLoaded()) {
+    return "";
+  }
+  if (tocIndex < 0 || tocIndex >= bookMetadataCache->getTocCount()) {
+    return "";
+  }
+  return bookMetadataCache->getTocEntry(tocIndex).anchor;
+}
+
+int Epub::getPageForAnchor(const int spineIndex, const std::string& anchor) const {
+  return Section::getPageForAnchor(cachePath, spineIndex, anchor);
 }
 
 int Epub::getTocIndexForSpineIndex(const int spineIndex) const { return getSpineItem(spineIndex).tocIndex; }
