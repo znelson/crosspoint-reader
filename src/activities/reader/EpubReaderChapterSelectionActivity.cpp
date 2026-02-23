@@ -32,7 +32,9 @@ void EpubReaderChapterSelectionActivity::onEnter() {
     return;
   }
 
-  selectorIndex = epub->getTocIndexForSpineIndex(currentSpineIndex);
+  selectorIndex = (currentTocIndex >= 0 && currentTocIndex < epub->getTocItemsCount())
+                      ? currentTocIndex
+                      : epub->getTocIndexForSpineIndex(currentSpineIndex);
   if (selectorIndex == -1) {
     selectorIndex = 0;
   }

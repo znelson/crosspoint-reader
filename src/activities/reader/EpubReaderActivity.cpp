@@ -375,6 +375,8 @@ void EpubReaderActivity::onReaderMenuConfirm(EpubReaderMenuActivity::MenuAction 
       const int currentP = section ? section->currentPage : 0;
       const int totalP = section ? section->pageCount : 0;
       const int spineIdx = currentSpineIndex;
+      const int tocIdx =
+          section ? section->getTocIndexForPage(currentP) : epub->getTocIndexForSpineIndex(currentSpineIndex);
       const std::string path = epub->getPath();
 
       // 1. Close the menu
@@ -382,7 +384,7 @@ void EpubReaderActivity::onReaderMenuConfirm(EpubReaderMenuActivity::MenuAction 
 
       // 2. Open the Chapter Selector
       enterNewActivity(new EpubReaderChapterSelectionActivity(
-          this->renderer, this->mappedInput, epub, path, spineIdx, currentP, totalP,
+          this->renderer, this->mappedInput, epub, path, spineIdx, currentP, totalP, tocIdx,
           [this] {
             exitActivity();
             requestUpdate();
