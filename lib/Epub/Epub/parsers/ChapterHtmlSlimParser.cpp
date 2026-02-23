@@ -148,9 +148,12 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
     }
   }
 
-  if (!idAttr.empty()) {
-    self->anchorPageMap[idAttr] = static_cast<uint16_t>(self->completedPageCount);
-  }
+  // Record anchor AFTER any block flush so completedPageCount reflects the correct page.
+  const auto recordAnchor = [self, &idAttr]() {
+    if (!idAttr.empty()) {
+      self->anchorPageMap[idAttr] = static_cast<uint16_t>(self->completedPageCount);
+    }
+  };
 
   auto centeredBlockStyle = BlockStyle();
   centeredBlockStyle.textAlignDefined = true;
@@ -167,6 +170,7 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
     if (self->partWordBufferIndex > 0) {
       self->flushPartWordBuffer();
     }
+    recordAnchor();
     self->tableDepth += 1;
     self->tableRowIndex = 0;
     self->tableColIndex = 0;
@@ -175,6 +179,7 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
   }
 
   if (self->tableDepth == 1 && strcmp(name, "tr") == 0) {
+    recordAnchor();
     self->tableRowIndex += 1;
     self->tableColIndex = 0;
     self->depth += 1;
@@ -194,6 +199,7 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
                            : static_cast<CssTextAlign>(self->paragraphAlignment);
     tableCellBlockStyle.alignment = align;
     self->startNewTextBlock(tableCellBlockStyle);
+    recordAnchor();
 
     const std::string headerText =
         "Tab Row " + std::to_string(self->tableRowIndex) + ", Cell " + std::to_string(self->tableColIndex) + ":";
@@ -387,6 +393,7 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
                 self->currentPage->elements.push_back(pageImage);
                 self->currentPageNextY += displayHeight;
 
+                recordAnchor();
                 self->depth += 1;
                 return;
               } else {
@@ -404,6 +411,7 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
       if (!alt.empty()) {
         alt = "[Image: " + alt + "]";
         self->startNewTextBlock(centeredBlockStyle);
+        recordAnchor();
         self->italicUntilDepth = std::min(self->italicUntilDepth, self->depth);
         self->depth += 1;
         self->characterData(userData, alt.c_str(), alt.length());
@@ -573,7 +581,7 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
     }
   }
 
-  // Unprocessed tag, just increasing depth and continue forward
+  recordAnchor();
   self->depth += 1;
 }
 
