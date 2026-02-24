@@ -342,18 +342,12 @@ void EpubReaderActivity::jumpToPercent(int percent) {
 void EpubReaderActivity::onReaderMenuConfirm(EpubReaderMenuActivity::MenuAction action) {
   switch (action) {
     case EpubReaderMenuActivity::MenuAction::SELECT_CHAPTER: {
-      // Calculate values BEFORE we start destroying things
-      const int currentP = section ? section->currentPage : 0;
-      const int totalP = section ? section->pageCount : 0;
-      const int spineIdx = currentSpineIndex;
-      const std::string path = epub->getPath();
-
       // 1. Close the menu
       exitActivity();
 
       // 2. Open the Chapter Selector
       enterNewActivity(new EpubReaderChapterSelectionActivity(
-          this->renderer, this->mappedInput, epub, path, spineIdx, currentP, totalP,
+          this->renderer, this->mappedInput, epub, epub->getPath(), currentSpineIndex,
           [this] {
             exitActivity();
             requestUpdate();
