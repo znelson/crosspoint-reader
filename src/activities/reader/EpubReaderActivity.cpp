@@ -234,15 +234,20 @@ void EpubReaderActivity::loop() {
           const int newSpineIndex = epub->getSpineIndexForTocIndex(nextTocIndex);
           const auto anchor = epub->getAnchorForTocIndex(nextTocIndex);
           int targetPage = 0;
+          bool anchorResolved = anchor.empty();
           if (!anchor.empty()) {
             const int resolved = epub->getPageForAnchor(newSpineIndex, anchor);
-            if (resolved >= 0) targetPage = resolved;
+            if (resolved >= 0) {
+              targetPage = resolved;
+              anchorResolved = true;
+            }
           }
 
           if (newSpineIndex == currentSpineIndex) {
             section->currentPage = targetPage;
           } else {
             nextPageNumber = targetPage;
+            pendingAnchor = anchorResolved ? "" : anchor;
             currentSpineIndex = newSpineIndex;
             section.reset();
           }
