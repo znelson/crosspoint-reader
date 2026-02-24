@@ -1,5 +1,7 @@
 #pragma once
 
+#include <span>
+
 #include "LiangHyphenation.h"
 
 // Generic Liang-backed hyphenator that stores pattern metadata plus language-specific helpers.
@@ -10,7 +12,7 @@ class LanguageHyphenator {
                      size_t minSuffix = LiangWordConfig::kDefaultMinSuffix)
       : patterns_(patterns), config_(isLetterFn, toLowerFn, minPrefix, minSuffix) {}
 
-  std::vector<size_t> breakIndexes(const std::vector<CodepointInfo>& cps) const {
+  std::vector<size_t> breakIndexes(std::span<const CodepointInfo> cps) const {
     return liangBreakIndexes(cps, patterns_, config_);
   }
 

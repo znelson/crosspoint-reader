@@ -1,6 +1,7 @@
 #include "LiangHyphenation.h"
 
 #include <algorithm>
+#include <span>
 #include <vector>
 
 /*
@@ -126,7 +127,7 @@ size_t encodeUtf8(uint32_t cp, AugmentedWord& word) {
 
 // Build the dotted, lowercase UTF-8 representation plus lookup tables into `word`.
 // Returns false if the word should be skipped (empty, non-letter, or too long).
-bool buildAugmentedWord(AugmentedWord& word, const std::vector<CodepointInfo>& cps, const LiangWordConfig& config) {
+bool buildAugmentedWord(AugmentedWord& word, std::span<const CodepointInfo> cps, const LiangWordConfig& config) {
   word.byteLen = 0;
   word.charCount_ = 0;
 
@@ -312,7 +313,7 @@ bool transition(const EmbeddedAutomaton& automaton, const AutomatonState& state,
 // Converts odd score positions back into codepoint indexes, honoring min prefix/suffix constraints.
 // Each break corresponds to scores[breakIndex + 1] because of the leading '.' sentinel.
 // Convert odd score entries into hyphen positions while honoring prefix/suffix limits.
-std::vector<size_t> collectBreakIndexes(const std::vector<CodepointInfo>& cps, const uint8_t* scores,
+std::vector<size_t> collectBreakIndexes(std::span<const CodepointInfo> cps, const uint8_t* scores,
                                         const size_t scoresSize, const size_t minPrefix, const size_t minSuffix) {
   std::vector<size_t> indexes;
   const size_t cpCount = cps.size();
@@ -346,7 +347,7 @@ std::vector<size_t> collectBreakIndexes(const std::vector<CodepointInfo>& cps, c
 }  // namespace
 
 // Entry point that runs the full Liang pipeline for a single word.
-std::vector<size_t> liangBreakIndexes(const std::vector<CodepointInfo>& cps,
+std::vector<size_t> liangBreakIndexes(std::span<const CodepointInfo> cps,
                                       const SerializedHyphenationPatterns& patterns, const LiangWordConfig& config) {
   // AugmentedWord uses fixed-size C arrays (no heap allocation) to avoid
   // fragmenting the heap across hundreds of words during page layout.

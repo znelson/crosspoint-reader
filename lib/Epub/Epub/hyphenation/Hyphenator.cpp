@@ -1,6 +1,7 @@
 #include "Hyphenator.h"
 
 #include <algorithm>
+#include <span>
 #include <vector>
 
 #include "HyphenationCommon.h"
@@ -95,7 +96,7 @@ std::vector<Hyphenator::BreakInfo> Hyphenator::breakOffsets(const std::string& w
         const bool atHyphen = !atEnd && isExplicitHyphen(cps[i].value);
         if (atEnd || atHyphen) {
           if (i > segStart) {
-            std::vector<CodepointInfo> segment(cps.begin() + segStart, cps.begin() + i);
+            std::span<const CodepointInfo> segment{cps.data() + segStart, i - segStart};
             auto segIndexes = hyphenator->breakIndexes(segment);
             for (const size_t idx : segIndexes) {
               const size_t cpIdx = segStart + idx;

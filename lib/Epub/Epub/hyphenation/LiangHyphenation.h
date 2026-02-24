@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <span>
 #include <vector>
 
 #include "HyphenationCommon.h"
@@ -34,5 +35,5 @@ struct LiangWordConfig {
 };
 
 // Shared Liang pattern evaluator used by every language-specific hyphenator.
-std::vector<size_t> liangBreakIndexes(const std::vector<CodepointInfo>& cps,
+std::vector<size_t> liangBreakIndexes(std::span<const CodepointInfo> cps,
                                       const SerializedHyphenationPatterns& patterns, const LiangWordConfig& config);
