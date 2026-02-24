@@ -1,5 +1,6 @@
 #pragma once
 #include <functional>
+#include <map>
 #include <memory>
 #include <string>
 #include <vector>
@@ -48,6 +49,8 @@ class Section {
 
   // Look up which page an anchor (HTML id) maps to. Returns -1 if not found.
   static int getPageForAnchor(const std::string& cachePath, int spineIndex, const std::string& anchor);
+  // Read the serialized anchor map from a section file into the provided map.
+  static bool readAnchorMap(const std::string& sectionPath, std::map<std::string, uint16_t>& out);
 
   // Build TOC boundary data for this spine (call once after section is loaded).
   void loadTocBoundaries();

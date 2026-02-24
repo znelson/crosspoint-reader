@@ -292,15 +292,10 @@ std::unique_ptr<Page> Section::loadPageFromSectionFile() {
   return page;
 }
 
-int Section::getPageForAnchor(const std::string& cachePath, const int spineIndex, const std::string& anchor) {
-  if (anchor.empty()) {
-    return -1;
-  }
-
+bool Section::readAnchorMap(const std::string& sectionPath, std::map<std::string, uint16_t>& out) {
   FsFile f;
-  const auto path = cachePath + "/sections/" + std::to_string(spineIndex) + ".bin";
-  if (!Storage.openFileForRead("SCT", path, f)) {
-    return -1;
+  if (!Storage.openFileForRead("SCT", sectionPath, f)) {
+    return false;
   }
 
   f.seek(HEADER_SIZE - sizeof(uint32_t));
@@ -308,7 +303,7 @@ int Section::getPageForAnchor(const std::string& cachePath, const int spineIndex
   serialization::readPod(f, anchorMapOffset);
   if (anchorMapOffset == 0) {
     f.close();
-    return -1;
+    return false;
   }
 
   f.seek(anchorMapOffset);
@@ -319,14 +314,26 @@ int Section::getPageForAnchor(const std::string& cachePath, const int spineIndex
     uint16_t page;
     serialization::readString(f, key);
     serialization::readPod(f, page);
-    if (key == anchor) {
-      f.close();
-      return static_cast<int>(page);
-    }
+    out[key] = page;
   }
 
   f.close();
-  return -1;
+  return true;
+}
+
+int Section::getPageForAnchor(const std::string& cachePath, const int spineIndex, const std::string& anchor) {
+  if (anchor.empty()) {
+    return -1;
+  }
+
+  std::map<std::string, uint16_t> anchorMap;
+  const auto path = cachePath + "/sections/" + std::to_string(spineIndex) + ".bin";
+  if (!readAnchorMap(path, anchorMap)) {
+    return -1;
+  }
+
+  auto it = anchorMap.find(anchor);
+  return it != anchorMap.end() ? static_cast<int>(it->second) : -1;
 }
 
 void Section::loadTocBoundaries() {
@@ -336,29 +343,8 @@ void Section::loadTocBoundaries() {
   const int startTocIndex = epub->getTocIndexForSpineIndex(spineIndex);
   if (startTocIndex < 0) return;
 
-  // Load anchor map from the section file
   std::map<std::string, uint16_t> anchorMap;
-  {
-    FsFile f;
-    if (Storage.openFileForRead("SCT", filePath, f)) {
-      f.seek(HEADER_SIZE - sizeof(uint32_t));
-      uint32_t anchorMapOffset;
-      serialization::readPod(f, anchorMapOffset);
-      if (anchorMapOffset > 0) {
-        f.seek(anchorMapOffset);
-        uint16_t count;
-        serialization::readPod(f, count);
-        for (uint16_t i = 0; i < count; i++) {
-          std::string key;
-          uint16_t page;
-          serialization::readString(f, key);
-          serialization::readPod(f, page);
-          anchorMap[key] = page;
-        }
-      }
-      f.close();
-    }
-  }
+  readAnchorMap(filePath, anchorMap);
 
   // Scan forward from the spine's primary TOC index to collect all entries for this spine
   const int tocCount = epub->getTocItemsCount();
