@@ -203,11 +203,14 @@ bool Section::createSectionFile(const int fontId, const float lineCompression, c
 
   // Collect TOC anchors for this spine so the parser can insert page breaks at chapter boundaries
   std::set<std::string> tocAnchors;
-  const int tocCount = epub->getTocItemsCount();
-  for (int i = 0; i < tocCount; i++) {
-    auto entry = epub->getTocItem(i);
-    if (entry.spineIndex == spineIndex && !entry.anchor.empty()) {
-      tocAnchors.insert(std::move(entry.anchor));
+  const int startTocIndex = epub->getTocIndexForSpineIndex(spineIndex);
+  if (startTocIndex >= 0) {
+    for (int i = startTocIndex; i < epub->getTocItemsCount(); i++) {
+      auto entry = epub->getTocItem(i);
+      if (entry.spineIndex != spineIndex) break;
+      if (!entry.anchor.empty()) {
+        tocAnchors.insert(std::move(entry.anchor));
+      }
     }
   }
 

@@ -394,15 +394,6 @@ void EpubReaderActivity::onReaderMenuConfirm(EpubReaderMenuActivity::MenuAction 
             exitActivity();
             requestUpdate();
           },
-          [this](const int newSpineIndex) {
-            if (currentSpineIndex != newSpineIndex) {
-              currentSpineIndex = newSpineIndex;
-              nextPageNumber = 0;
-              section.reset();
-            }
-            exitActivity();
-            requestUpdate();
-          },
           [this](const int newSpineIndex, const int newPage, const std::string& anchor) {
             pendingAnchor = anchor;
             if (currentSpineIndex != newSpineIndex || (section && section->currentPage != newPage) ||

@@ -63,12 +63,12 @@ void EpubReaderChapterSelectionActivity::loop() {
       if (!anchor.empty()) {
         const int anchorPage = epub->getPageForAnchor(newSpineIndex, anchor);
         if (anchorPage >= 0) {
-          onSyncPosition(newSpineIndex, anchorPage, "");
+          onSelectPosition(newSpineIndex, anchorPage, "");
         } else {
-          onSyncPosition(newSpineIndex, 0, anchor);
+          onSelectPosition(newSpineIndex, 0, anchor);
         }
       } else {
-        onSelectSpineIndex(newSpineIndex);
+        onSelectPosition(newSpineIndex, 0, "");
       }
     }
   } else if (mappedInput.wasReleased(MappedInputManager::Button::Back)) {

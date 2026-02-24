@@ -152,8 +152,8 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
   // If this anchor is a TOC chapter boundary, start a fresh page so the chapter doesn't
   // begin mid-page.
   const auto recordAnchor = [self, &idAttr]() {
-    if (idAttr.empty()) return;
-    if (self->tocAnchors.count(idAttr) && self->currentPage && !self->currentPage->elements.empty()) {
+    if (idAttr.empty() || !self->tocAnchors.count(idAttr)) return;
+    if (self->currentPage && !self->currentPage->elements.empty()) {
       self->completePageFn(std::move(self->currentPage));
       self->completedPageCount++;
       self->currentPage.reset(new Page());
