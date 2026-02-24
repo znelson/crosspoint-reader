@@ -10,6 +10,7 @@ class EpubReaderActivity final : public ActivityWithSubactivity {
   std::unique_ptr<Section> section = nullptr;
   int currentSpineIndex = 0;
   int nextPageNumber = 0;
+  std::string pendingAnchor;
   int pagesUntilFullRefresh = 0;
   int cachedSpineIndex = 0;
   int cachedChapterTotalPageCount = 0;

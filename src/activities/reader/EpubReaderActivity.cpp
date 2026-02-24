@@ -398,8 +398,10 @@ void EpubReaderActivity::onReaderMenuConfirm(EpubReaderMenuActivity::MenuAction 
             exitActivity();
             requestUpdate();
           },
-          [this](const int newSpineIndex, const int newPage) {
-            if (currentSpineIndex != newSpineIndex || (section && section->currentPage != newPage)) {
+          [this](const int newSpineIndex, const int newPage, const std::string& anchor) {
+            pendingAnchor = anchor;
+            if (currentSpineIndex != newSpineIndex || (section && section->currentPage != newPage) ||
+                !anchor.empty()) {
               currentSpineIndex = newSpineIndex;
               nextPageNumber = newPage;
               section.reset();
@@ -599,6 +601,14 @@ void EpubReaderActivity::render(Activity::RenderLock&& lock) {
       section->currentPage = section->pageCount - 1;
     } else {
       section->currentPage = nextPageNumber;
+    }
+
+    if (!pendingAnchor.empty()) {
+      const int resolvedPage = epub->getPageForAnchor(currentSpineIndex, pendingAnchor);
+      if (resolvedPage >= 0) {
+        section->currentPage = resolvedPage;
+      }
+      pendingAnchor.clear();
     }
 
     // handles changes in reader settings and reset to approximate position based on cached progress

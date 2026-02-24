@@ -18,7 +18,7 @@ class EpubReaderChapterSelectionActivity final : public ActivityWithSubactivity 
 
   const std::function<void()> onGoBack;
   const std::function<void(int newSpineIndex)> onSelectSpineIndex;
-  const std::function<void(int newSpineIndex, int newPage)> onSyncPosition;
+  const std::function<void(int newSpineIndex, int newPage, const std::string& anchor)> onSyncPosition;
 
   // Number of items that fit on a page, derived from logical screen height.
   // This adapts automatically when switching between portrait and landscape.
@@ -34,7 +34,7 @@ class EpubReaderChapterSelectionActivity final : public ActivityWithSubactivity 
                                               const int totalPagesInSpine, const int currentTocIndex,
                                               const std::function<void()>& onGoBack,
                                               const std::function<void(int newSpineIndex)>& onSelectSpineIndex,
-                                              const std::function<void(int newSpineIndex, int newPage)>& onSyncPosition)
+                                              const std::function<void(int newSpineIndex, int newPage, const std::string& anchor)>& onSyncPosition)
       : ActivityWithSubactivity("EpubReaderChapterSelection", renderer, mappedInput),
         epub(epub),
         epubPath(epubPath),
