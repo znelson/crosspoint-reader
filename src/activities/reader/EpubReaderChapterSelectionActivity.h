@@ -27,12 +27,11 @@ class EpubReaderChapterSelectionActivity final : public ActivityWithSubactivity 
   int getTotalItems() const;
 
  public:
-  explicit EpubReaderChapterSelectionActivity(GfxRenderer& renderer, MappedInputManager& mappedInput,
-                                              const std::shared_ptr<Epub>& epub, const std::string& epubPath,
-                                              const int currentSpineIndex, const int currentPage,
-                                              const int totalPagesInSpine, const int currentTocIndex,
-                                              const std::function<void()>& onGoBack,
-                                              const std::function<void(int newSpineIndex, int newPage, const std::string& anchor)>& onSelectPosition)
+  explicit EpubReaderChapterSelectionActivity(
+      GfxRenderer& renderer, MappedInputManager& mappedInput, const std::shared_ptr<Epub>& epub,
+      const std::string& epubPath, const int currentSpineIndex, const int currentPage, const int totalPagesInSpine,
+      const int currentTocIndex, const std::function<void()>& onGoBack,
+      const std::function<void(int newSpineIndex, int newPage, const std::string& anchor)>& onSelectPosition)
       : ActivityWithSubactivity("EpubReaderChapterSelection", renderer, mappedInput),
         epub(epub),
         epubPath(epubPath),
