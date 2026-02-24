@@ -605,10 +605,13 @@ CssStyle CssParser::resolveStyle(const std::string_view tagName, const std::stri
   if (!classAttr.empty()) {
     const auto classes = splitWhitespace(classAttr);
 
+    std::string keyBuf;
     for (const auto& cls : classes) {
-      std::string classKey = "." + normalized(cls);
+      keyBuf.clear();
+      keyBuf.push_back('.');
+      keyBuf.append(normalized(cls));
 
-      auto classIt = rulesBySelector_.find(classKey);
+      auto classIt = rulesBySelector_.find(keyBuf);
       if (classIt != rulesBySelector_.end()) {
         result.applyOver(classIt->second);
       }
@@ -617,9 +620,12 @@ CssStyle CssParser::resolveStyle(const std::string_view tagName, const std::stri
     // TODO: Support combinations of classes (e.g. style on p.class1.class2)
     // 3. Apply element.class styles (higher priority)
     for (const auto& cls : classes) {
-      std::string combinedKey = tag + "." + normalized(cls);
+      keyBuf.clear();
+      keyBuf.append(tag);
+      keyBuf.push_back('.');
+      keyBuf.append(normalized(cls));
 
-      auto combinedIt = rulesBySelector_.find(combinedKey);
+      auto combinedIt = rulesBySelector_.find(keyBuf);
       if (combinedIt != rulesBySelector_.end()) {
         result.applyOver(combinedIt->second);
       }
