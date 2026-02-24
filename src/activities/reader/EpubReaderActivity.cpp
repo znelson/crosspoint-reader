@@ -228,12 +228,35 @@ void EpubReaderActivity::loop() {
   const bool skipChapter = SETTINGS.longPressChapterSkip && mappedInput.getHeldTime() > skipChapterMs;
 
   if (skipChapter) {
-    // We don't want to delete the section mid-render, so grab the semaphore
     {
       RenderLock lock(*this);
-      nextPageNumber = 0;
-      currentSpineIndex = nextTriggered ? currentSpineIndex + 1 : currentSpineIndex - 1;
-      section.reset();
+
+      if (section && section->pageCount > 0) {
+        const int curTocIndex = section->getTocIndexForPage(section->currentPage);
+        const int nextTocIndex = nextTriggered ? curTocIndex + 1 : curTocIndex - 1;
+
+        if (nextTocIndex >= 0 && nextTocIndex < epub->getTocItemsCount()) {
+          const int newSpineIndex = epub->getSpineIndexForTocIndex(nextTocIndex);
+
+          if (newSpineIndex == currentSpineIndex) {
+            section->currentPage = section->getPageForTocIndex(nextTocIndex).value_or(0);
+          } else {
+            pendingTocIndex = nextTocIndex;
+            nextPageNumber = 0;
+            currentSpineIndex = newSpineIndex;
+            section.reset();
+          }
+        } else {
+          // Beyond TOC bounds — fall back to spine-level skip
+          nextPageNumber = 0;
+          currentSpineIndex = nextTriggered ? currentSpineIndex + 1 : currentSpineIndex - 1;
+          section.reset();
+        }
+      } else {
+        nextPageNumber = 0;
+        currentSpineIndex = nextTriggered ? currentSpineIndex + 1 : currentSpineIndex - 1;
+        section.reset();
+      }
     }
     requestUpdate();
     return;
@@ -352,6 +375,8 @@ void EpubReaderActivity::onReaderMenuConfirm(EpubReaderMenuActivity::MenuAction 
       const int currentP = section ? section->currentPage : 0;
       const int totalP = section ? section->pageCount : 0;
       const int spineIdx = currentSpineIndex;
+      const int tocIdx =
+          section ? section->getTocIndexForPage(currentP) : epub->getTocIndexForSpineIndex(currentSpineIndex);
       const std::string path = epub->getPath();
 
       // 1. Close the menu
@@ -359,24 +384,20 @@ void EpubReaderActivity::onReaderMenuConfirm(EpubReaderMenuActivity::MenuAction 
 
       // 2. Open the Chapter Selector
       enterNewActivity(new EpubReaderChapterSelectionActivity(
-          this->renderer, this->mappedInput, epub, path, spineIdx, currentP, totalP,
+          this->renderer, this->mappedInput, epub, path, spineIdx, currentP, totalP, tocIdx,
           [this] {
             exitActivity();
             requestUpdate();
           },
-          [this](const int newSpineIndex) {
-            if (currentSpineIndex != newSpineIndex) {
+          [this](const int newSpineIndex, const int tocIndex) {
+            auto resolvedPage =
+                (newSpineIndex == currentSpineIndex && section) ? section->getPageForTocIndex(tocIndex) : std::nullopt;
+            if (resolvedPage) {
+              section->currentPage = *resolvedPage;
+            } else {
+              pendingTocIndex = tocIndex;
               currentSpineIndex = newSpineIndex;
               nextPageNumber = 0;
-              section.reset();
-            }
-            exitActivity();
-            requestUpdate();
-          },
-          [this](const int newSpineIndex, const int newPage) {
-            if (currentSpineIndex != newSpineIndex || (section && section->currentPage != newPage)) {
-              currentSpineIndex = newSpineIndex;
-              nextPageNumber = newPage;
               section.reset();
             }
             exitActivity();
@@ -591,6 +612,13 @@ void EpubReaderActivity::render(Activity::RenderLock&& lock) {
       section->currentPage = section->pageCount - 1;
     } else {
       section->currentPage = nextPageNumber;
+    }
+
+    if (pendingTocIndex) {
+      if (const auto resolvedPage = section->getPageForTocIndex(*pendingTocIndex)) {
+        section->currentPage = *resolvedPage;
+      }
+      pendingTocIndex.reset();
     }
 
     // handles changes in reader settings and reset to approximate position based on cached progress
@@ -819,7 +847,8 @@ void EpubReaderActivity::renderStatusBar(const int orientedMarginRight, const in
     // available space.
     int titleMarginLeftAdjusted = std::max(titleMarginLeft, titleMarginRight);
     int availableTitleSpace = rendererableScreenWidth - 2 * titleMarginLeftAdjusted;
-    const int tocIndex = epub->getTocIndexForSpineIndex(currentSpineIndex);
+    const int tocIndex =
+        section ? section->getTocIndexForPage(section->currentPage) : epub->getTocIndexForSpineIndex(currentSpineIndex);
 
     std::string title;
     int titleWidth;
