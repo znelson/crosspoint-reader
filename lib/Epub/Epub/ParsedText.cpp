@@ -371,6 +371,10 @@ bool ParsedText::hyphenateWordAtIndex(const size_t wordIndex, const int availabl
   int chosenWidth = -1;
   bool chosenNeedsHyphen = true;
 
+  // Reuse a single buffer across iterations to avoid allocating a new string per breakpoint
+  std::string prefixBuf;
+  prefixBuf.reserve(word.size());
+
   // Iterate over each legal breakpoint and retain the widest prefix that still fits.
   for (const auto& info : breakInfos) {
     const size_t offset = info.byteOffset;
@@ -379,7 +383,8 @@ bool ParsedText::hyphenateWordAtIndex(const size_t wordIndex, const int availabl
     }
 
     const bool needsHyphen = info.requiresInsertedHyphen;
-    const int prefixWidth = measureWordWidth(renderer, fontId, word.substr(0, offset), style, needsHyphen);
+    prefixBuf.assign(word, 0, offset);
+    const int prefixWidth = measureWordWidth(renderer, fontId, prefixBuf, style, needsHyphen);
     if (prefixWidth > availableWidth || prefixWidth <= chosenWidth) {
       continue;  // Skip if too wide or not an improvement
     }
@@ -395,7 +400,7 @@ bool ParsedText::hyphenateWordAtIndex(const size_t wordIndex, const int availabl
   }
 
   // Split the word at the selected breakpoint and append a hyphen if required.
-  std::string remainder = word.substr(chosenOffset);
+  std::string remainder(word, chosenOffset);
   words[wordIndex].resize(chosenOffset);
   if (chosenNeedsHyphen) {
     words[wordIndex].push_back('-');

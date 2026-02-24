@@ -252,6 +252,9 @@ bool TxtReaderActivity::loadPageAtOffset(size_t offset, std::vector<std::string>
     // Track position within this source line (in bytes from pos)
     size_t lineBytePos = 0;
 
+    // Reusable buffer for width measurement to avoid repeated allocations
+    std::string measureBuf;
+
     // Word wrap if needed
     while (!line.empty() && static_cast<int>(outLines.size()) < linesPerPage) {
       int lineWidth = renderer.getTextWidth(cachedFontId, line.c_str());
@@ -265,7 +268,9 @@ bool TxtReaderActivity::loadPageAtOffset(size_t offset, std::vector<std::string>
 
       // Find break point
       size_t breakPos = line.length();
-      while (breakPos > 0 && renderer.getTextWidth(cachedFontId, line.substr(0, breakPos).c_str()) > viewportWidth) {
+      while (breakPos > 0) {
+        measureBuf.assign(line, 0, breakPos);
+        if (renderer.getTextWidth(cachedFontId, measureBuf.c_str()) <= viewportWidth) break;
         // Try to break at space
         size_t spacePos = line.rfind(' ', breakPos - 1);
         if (spacePos != std::string::npos && spacePos > 0) {
@@ -284,7 +289,7 @@ bool TxtReaderActivity::loadPageAtOffset(size_t offset, std::vector<std::string>
         breakPos = 1;
       }
 
-      outLines.push_back(line.substr(0, breakPos));
+      outLines.emplace_back(line, 0, breakPos);
 
       // Skip space at break point
       size_t skipChars = breakPos;
@@ -292,7 +297,7 @@ bool TxtReaderActivity::loadPageAtOffset(size_t offset, std::vector<std::string>
         skipChars++;
       }
       lineBytePos += skipChars;
-      line = line.substr(skipChars);
+      line.erase(0, skipChars);
     }
 
     // Determine how much of the source buffer we consumed

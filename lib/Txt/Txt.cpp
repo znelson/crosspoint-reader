@@ -1,8 +1,20 @@
 #include "Txt.h"
 
+#include <string_view>
+
 #include <FsHelpers.h>
 #include <JpegToBmpConverter.h>
 #include <Logging.h>
+
+namespace {
+bool endsWithCaseInsensitive(const std::string& str, std::string_view suffix) {
+  if (str.size() < suffix.size()) return false;
+  for (size_t i = 0; i < suffix.size(); ++i) {
+    if (tolower(str[str.size() - suffix.size() + i]) != tolower(suffix[i])) return false;
+  }
+  return true;
+}
+}  // namespace
 
 Txt::Txt(std::string path, std::string cacheBasePath)
     : filepath(std::move(path)), cacheBasePath(std::move(cacheBasePath)) {
@@ -41,8 +53,8 @@ std::string Txt::getTitle() const {
   std::string filename = (lastSlash != std::string::npos) ? filepath.substr(lastSlash + 1) : filepath;
 
   // Remove .txt extension
-  if (filename.length() >= 4 && filename.substr(filename.length() - 4) == ".txt") {
-    filename = filename.substr(0, filename.length() - 4);
+  if (filename.ends_with(".txt")) {
+    filename.resize(filename.length() - 4);
   }
 
   return filename;
@@ -113,11 +125,9 @@ bool Txt::generateCoverBmp() const {
   setupCacheDir();
 
   // Get file extension
-  const size_t len = coverImagePath.length();
-  const bool isJpg =
-      (len >= 4 && (coverImagePath.substr(len - 4) == ".jpg" || coverImagePath.substr(len - 4) == ".JPG")) ||
-      (len >= 5 && (coverImagePath.substr(len - 5) == ".jpeg" || coverImagePath.substr(len - 5) == ".JPEG"));
-  const bool isBmp = len >= 4 && (coverImagePath.substr(len - 4) == ".bmp" || coverImagePath.substr(len - 4) == ".BMP");
+  const bool isJpg = endsWithCaseInsensitive(coverImagePath, ".jpg") ||
+                     endsWithCaseInsensitive(coverImagePath, ".jpeg");
+  const bool isBmp = endsWithCaseInsensitive(coverImagePath, ".bmp");
 
   if (isBmp) {
     // Copy BMP file to cache

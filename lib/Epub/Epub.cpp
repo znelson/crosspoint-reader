@@ -1,5 +1,7 @@
 #include "Epub.h"
 
+#include <string_view>
+
 #include <FsHelpers.h>
 #include <HalStorage.h>
 #include <JpegToBmpConverter.h>
@@ -103,14 +105,10 @@ bool Epub::parseContentOpf(BookMetadataCache::BookMetadata& bookMetadata) {
           pos += strlen(pattern);
           const auto endPos = coverPageHtml.find('"', pos);
           if (endPos != std::string::npos) {
-            const auto ref = coverPageHtml.substr(pos, endPos - pos);
-            // Check if it's an image file
-            if (ref.length() >= 4) {
-              const auto ext = ref.substr(ref.length() - 4);
-              if (ext == ".png" || ext == ".jpg" || ext == "jpeg" || ext == ".gif") {
-                imageRef = ref;
-                break;
-              }
+            const std::string_view ref{coverPageHtml.data() + pos, endPos - pos};
+            if (ref.ends_with(".png") || ref.ends_with(".jpg") || ref.ends_with(".jpeg") || ref.ends_with(".gif")) {
+              imageRef = ref;
+              break;
             }
           }
           pos = coverPageHtml.find(pattern, pos);
@@ -541,8 +539,7 @@ bool Epub::generateCoverBmp(bool cropped) const {
     return false;
   }
 
-  if (coverImageHref.substr(coverImageHref.length() - 4) == ".jpg" ||
-      coverImageHref.substr(coverImageHref.length() - 5) == ".jpeg") {
+  if (coverImageHref.ends_with(".jpg") || coverImageHref.ends_with(".jpeg")) {
     LOG_DBG("EBP", "Generating BMP from JPG cover image (%s mode)", cropped ? "cropped" : "fit");
     const auto coverJpgTempPath = getCachePath() + "/.cover.jpg";
 
@@ -575,7 +572,7 @@ bool Epub::generateCoverBmp(bool cropped) const {
     return success;
   }
 
-  if (coverImageHref.substr(coverImageHref.length() - 4) == ".png") {
+  if (coverImageHref.ends_with(".png")) {
     LOG_DBG("EBP", "Generating BMP from PNG cover image (%s mode)", cropped ? "cropped" : "fit");
     const auto coverPngTempPath = getCachePath() + "/.cover.png";
 
@@ -629,8 +626,7 @@ bool Epub::generateThumbBmp(int height) const {
   const auto coverImageHref = bookMetadataCache->coreMetadata.coverItemHref;
   if (coverImageHref.empty()) {
     LOG_DBG("EBP", "No known cover image for thumbnail");
-  } else if (coverImageHref.substr(coverImageHref.length() - 4) == ".jpg" ||
-             coverImageHref.substr(coverImageHref.length() - 5) == ".jpeg") {
+  } else if (coverImageHref.ends_with(".jpg") || coverImageHref.ends_with(".jpeg")) {
     LOG_DBG("EBP", "Generating thumb BMP from JPG cover image");
     const auto coverJpgTempPath = getCachePath() + "/.cover.jpg";
 
@@ -666,7 +662,7 @@ bool Epub::generateThumbBmp(int height) const {
     }
     LOG_DBG("EBP", "Generated thumb BMP from JPG cover image, success: %s", success ? "yes" : "no");
     return success;
-  } else if (coverImageHref.substr(coverImageHref.length() - 4) == ".png") {
+  } else if (coverImageHref.ends_with(".png")) {
     LOG_DBG("EBP", "Generating thumb BMP from PNG cover image");
     const auto coverPngTempPath = getCachePath() + "/.cover.png";
 

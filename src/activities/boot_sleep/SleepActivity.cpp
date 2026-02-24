@@ -50,7 +50,7 @@ void SleepActivity::renderCustomSleepScreen() const {
         continue;
       }
 
-      if (filename.substr(filename.length() - 4) != ".bmp") {
+      if (!filename.ends_with(".bmp")) {
         LOG_DBG("SLP", "Skipping non-.bmp file name: %s", name);
         file.close();
         continue;

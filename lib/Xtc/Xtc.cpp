@@ -50,9 +50,12 @@ void Xtc::setupCacheDir() const {
   }
 
   // Create directories recursively
+  std::string pathBuf;
+  pathBuf.reserve(cachePath.length());
   for (size_t i = 1; i < cachePath.length(); i++) {
     if (cachePath[i] == '/') {
-      Storage.mkdir(cachePath.substr(0, i).c_str());
+      pathBuf.assign(cachePath, 0, i);
+      Storage.mkdir(pathBuf.c_str());
     }
   }
   Storage.mkdir(cachePath.c_str());

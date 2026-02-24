@@ -3,6 +3,7 @@
 #include <Utf8.h>
 
 #include <cstring>
+#include <string_view>
 
 namespace StringUtils {
 
@@ -46,13 +47,14 @@ std::string sanitizeFilename(const std::string& name, size_t maxBytes) {
 }
 
 bool checkFileExtension(const std::string& fileName, const char* extension) {
-  if (fileName.length() < strlen(extension)) {
+  const size_t extLen = strlen(extension);
+  if (fileName.length() < extLen) {
     return false;
   }
 
-  const std::string fileExt = fileName.substr(fileName.length() - strlen(extension));
-  for (size_t i = 0; i < fileExt.length(); i++) {
-    if (tolower(fileExt[i]) != tolower(extension[i])) {
+  const std::string_view tail{fileName.data() + fileName.length() - extLen, extLen};
+  for (size_t i = 0; i < extLen; i++) {
+    if (tolower(static_cast<unsigned char>(tail[i])) != tolower(static_cast<unsigned char>(extension[i]))) {
       return false;
     }
   }

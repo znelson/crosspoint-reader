@@ -4,6 +4,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 
 #include "JpegToFramebufferConverter.h"
 #include "PngToFramebufferConverter.h"
@@ -12,15 +13,13 @@ std::unique_ptr<JpegToFramebufferConverter> ImageDecoderFactory::jpegDecoder = n
 std::unique_ptr<PngToFramebufferConverter> ImageDecoderFactory::pngDecoder = nullptr;
 
 ImageToFramebufferDecoder* ImageDecoderFactory::getDecoder(const std::string& imagePath) {
-  std::string ext = imagePath;
-  size_t dotPos = ext.rfind('.');
+  size_t dotPos = imagePath.rfind('.');
+  std::string ext;
   if (dotPos != std::string::npos) {
-    ext = ext.substr(dotPos);
-    for (auto& c : ext) {
-      c = tolower(c);
+    ext.reserve(imagePath.size() - dotPos);
+    for (size_t i = dotPos; i < imagePath.size(); ++i) {
+      ext.push_back(static_cast<char>(tolower(static_cast<unsigned char>(imagePath[i]))));
     }
-  } else {
-    ext = "";
   }
 
   if (JpegToFramebufferConverter::supportsFormat(ext)) {
