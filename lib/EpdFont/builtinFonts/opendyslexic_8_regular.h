@@ -2293,7 +2293,7 @@ static const EpdKernClassEntry opendyslexic_8_regularKernRightClasses[] = {
 };
 
 static const int8_t opendyslexic_8_regularKernMatrix[] = {
-       2,
+       3,
 };
 
 static const EpdFontData opendyslexic_8_regular = {

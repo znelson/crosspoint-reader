@@ -3912,7 +3912,7 @@ static const EpdKernClassEntry opendyslexic_14_boldKernRightClasses[] = {
 };
 
 static const int8_t opendyslexic_14_boldKernMatrix[] = {
-       4,
+       5,
 };
 
 static const EpdFontData opendyslexic_14_bold = {

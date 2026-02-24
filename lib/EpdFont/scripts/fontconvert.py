@@ -412,7 +412,7 @@ def extract_kerning_fonttools(font_path, codepoints, ppem):
     for (lg, rg), du in raw_kern.items():
         lcp = glyph_to_cp[lg]
         rcp = glyph_to_cp[rg]
-        adjust = int(math.floor(du * scale))
+        adjust = round(du * scale)
         if adjust != 0:
             adjust = max(-128, min(127, adjust))
             result[(lcp, rcp)] = adjust
