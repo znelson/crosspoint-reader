@@ -746,31 +746,34 @@ int Epub::getSpineItemsCount() const {
   return bookMetadataCache->getSpineCount();
 }
 
-size_t Epub::getCumulativeSpineItemSize(const int spineIndex) const { return getSpineItem(spineIndex).cumulativeSize; }
+size_t Epub::getCumulativeSpineItemSize(const int spineIndex) const {
+  const auto entry = getSpineItem(spineIndex);
+  return entry ? entry->cumulativeSize : 0;
+}
 
-BookMetadataCache::SpineEntry Epub::getSpineItem(const int spineIndex) const {
+std::optional<BookMetadataCache::SpineEntry> Epub::getSpineItem(const int spineIndex) const {
   if (!bookMetadataCache || !bookMetadataCache->isLoaded()) {
     LOG_ERR("EBP", "getSpineItem called but cache not loaded");
-    return {};
+    return std::nullopt;
   }
 
   if (spineIndex < 0 || spineIndex >= bookMetadataCache->getSpineCount()) {
     LOG_ERR("EBP", "getSpineItem index:%d is out of range", spineIndex);
-    return bookMetadataCache->getSpineEntry(0);
+    return std::nullopt;
   }
 
   return bookMetadataCache->getSpineEntry(spineIndex);
 }
 
-BookMetadataCache::TocEntry Epub::getTocItem(const int tocIndex) const {
+std::optional<BookMetadataCache::TocEntry> Epub::getTocItem(const int tocIndex) const {
   if (!bookMetadataCache || !bookMetadataCache->isLoaded()) {
     LOG_DBG("EBP", "getTocItem called but cache not loaded");
-    return {};
+    return std::nullopt;
   }
 
   if (tocIndex < 0 || tocIndex >= bookMetadataCache->getTocCount()) {
     LOG_DBG("EBP", "getTocItem index:%d is out of range", tocIndex);
-    return {};
+    return std::nullopt;
   }
 
   return bookMetadataCache->getTocEntry(tocIndex);
@@ -784,28 +787,31 @@ int Epub::getTocItemsCount() const {
   return bookMetadataCache->getTocCount();
 }
 
-// work out the section index for a toc index
-int Epub::getSpineIndexForTocIndex(const int tocIndex) const {
+std::optional<int> Epub::getSpineIndexForTocIndex(const int tocIndex) const {
   if (!bookMetadataCache || !bookMetadataCache->isLoaded()) {
     LOG_ERR("EBP", "getSpineIndexForTocIndex called but cache not loaded");
-    return 0;
+    return std::nullopt;
   }
 
   if (tocIndex < 0 || tocIndex >= bookMetadataCache->getTocCount()) {
     LOG_ERR("EBP", "getSpineIndexForTocIndex: tocIndex %d out of range", tocIndex);
-    return 0;
+    return std::nullopt;
   }
 
-  const int spineIndex = bookMetadataCache->getTocEntry(tocIndex).spineIndex;
-  if (spineIndex < 0) {
+  const auto spineIndex = bookMetadataCache->getTocEntry(tocIndex).spineIndex;
+  if (!spineIndex) {
     LOG_DBG("EBP", "Section not found for TOC index %d", tocIndex);
-    return 0;
+    return std::nullopt;
   }
 
-  return spineIndex;
+  return static_cast<int>(*spineIndex);
 }
 
-int Epub::getTocIndexForSpineIndex(const int spineIndex) const { return getSpineItem(spineIndex).tocIndex; }
+std::optional<int> Epub::getTocIndexForSpineIndex(const int spineIndex) const {
+  const auto entry = getSpineItem(spineIndex);
+  if (!entry || !entry->tocIndex) return std::nullopt;
+  return static_cast<int>(*entry->tocIndex);
+}
 
 size_t Epub::getBookSize() const {
   if (!bookMetadataCache || !bookMetadataCache->isLoaded() || bookMetadataCache->getSpineCount() == 0) {
@@ -831,7 +837,8 @@ int Epub::getSpineIndexForTextReference() const {
 
   // loop through spine items to get the correct index matching the text href
   for (size_t i = 0; i < getSpineItemsCount(); i++) {
-    if (getSpineItem(i).href == bookMetadataCache->coreMetadata.textReferenceHref) {
+    const auto entry = getSpineItem(i);
+    if (entry && entry->href == bookMetadataCache->coreMetadata.textReferenceHref) {
       LOG_DBG("EBP", "Text reference %s found at index %d", bookMetadataCache->coreMetadata.textReferenceHref.c_str(),
               i);
       return i;

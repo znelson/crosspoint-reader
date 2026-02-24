@@ -20,8 +20,9 @@ KOReaderPosition ProgressMapper::toKOReader(const std::shared_ptr<Epub>& epub, c
   result.xpath = generateXPath(pos.spineIndex, pos.pageNumber, pos.totalPages);
 
   // Get chapter info for logging
-  const int tocIndex = epub->getTocIndexForSpineIndex(pos.spineIndex);
-  const std::string chapterName = (tocIndex >= 0) ? epub->getTocItem(tocIndex).title : "unknown";
+  const auto tocIndex = epub->getTocIndexForSpineIndex(pos.spineIndex);
+  const auto tocItem = tocIndex ? epub->getTocItem(*tocIndex) : std::nullopt;
+  const std::string chapterName = tocItem ? tocItem->title : "unknown";
 
   LOG_DBG("ProgressMapper", "CrossPoint -> KOReader: chapter='%s', page=%d/%d -> %.2f%% at %s", chapterName.c_str(),
           pos.pageNumber, pos.totalPages, result.percentage * 100, result.xpath.c_str());

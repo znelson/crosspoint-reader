@@ -130,7 +130,12 @@ bool Section::createSectionFile(const int fontId, const float lineCompression, c
                                 const uint8_t paragraphAlignment, const uint16_t viewportWidth,
                                 const uint16_t viewportHeight, const bool hyphenationEnabled, const bool embeddedStyle,
                                 const std::function<void()>& popupFn) {
-  const auto localPath = epub->getSpineItem(spineIndex).href;
+  const auto spineEntry = epub->getSpineItem(spineIndex);
+  if (!spineEntry) {
+    LOG_ERR("SEC", "Failed to get spine item for index: %d", spineIndex);
+    return false;
+  }
+  const auto& localPath = spineEntry->href;
   const auto tmpHtmlPath = epub->getCachePath() + "/.tmp_" + std::to_string(spineIndex) + ".html";
 
   // Create cache directory if it doesn't exist

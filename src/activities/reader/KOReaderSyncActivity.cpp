@@ -269,14 +269,16 @@ void KOReaderSyncActivity::render(Activity::RenderLock&&) {
     renderer.drawCenteredText(UI_10_FONT_ID, 120, tr(STR_PROGRESS_FOUND), true, EpdFontFamily::BOLD);
 
     // Get chapter names from TOC
-    const int remoteTocIndex = epub->getTocIndexForSpineIndex(remotePosition.spineIndex);
-    const int localTocIndex = epub->getTocIndexForSpineIndex(currentSpineIndex);
+    const auto remoteTocIndex = epub->getTocIndexForSpineIndex(remotePosition.spineIndex);
+    const auto localTocIndex = epub->getTocIndexForSpineIndex(currentSpineIndex);
+    const auto remoteTocItem = remoteTocIndex ? epub->getTocItem(*remoteTocIndex) : std::nullopt;
+    const auto localTocItem = localTocIndex ? epub->getTocItem(*localTocIndex) : std::nullopt;
     const std::string remoteChapter =
-        (remoteTocIndex >= 0) ? epub->getTocItem(remoteTocIndex).title
-                              : (std::string(tr(STR_SECTION_PREFIX)) + std::to_string(remotePosition.spineIndex + 1));
+        remoteTocItem ? remoteTocItem->title
+                      : (std::string(tr(STR_SECTION_PREFIX)) + std::to_string(remotePosition.spineIndex + 1));
     const std::string localChapter =
-        (localTocIndex >= 0) ? epub->getTocItem(localTocIndex).title
-                             : (std::string(tr(STR_SECTION_PREFIX)) + std::to_string(currentSpineIndex + 1));
+        localTocItem ? localTocItem->title
+                     : (std::string(tr(STR_SECTION_PREFIX)) + std::to_string(currentSpineIndex + 1));
 
     // Remote progress - chapter and page
     renderer.drawText(UI_10_FONT_ID, 20, 160, tr(STR_REMOTE_LABEL), true);

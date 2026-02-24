@@ -32,10 +32,7 @@ void EpubReaderChapterSelectionActivity::onEnter() {
     return;
   }
 
-  selectorIndex = epub->getTocIndexForSpineIndex(currentSpineIndex);
-  if (selectorIndex == -1) {
-    selectorIndex = 0;
-  }
+  selectorIndex = epub->getTocIndexForSpineIndex(currentSpineIndex).value_or(0);
 
   // Trigger first update
   requestUpdate();
@@ -54,10 +51,10 @@ void EpubReaderChapterSelectionActivity::loop() {
 
   if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
     const auto newSpineIndex = epub->getSpineIndexForTocIndex(selectorIndex);
-    if (newSpineIndex == -1) {
+    if (!newSpineIndex) {
       onGoBack();
     } else {
-      onSelectSpineIndex(newSpineIndex);
+      onSelectSpineIndex(*newSpineIndex);
     }
   } else if (mappedInput.wasReleased(MappedInputManager::Button::Back)) {
     onGoBack();
@@ -118,12 +115,12 @@ void EpubReaderChapterSelectionActivity::render(Activity::RenderLock&&) {
     const int displayY = 60 + contentY + i * 30;
     const bool isSelected = (itemIndex == selectorIndex);
 
-    auto item = epub->getTocItem(itemIndex);
+    const auto item = epub->getTocItem(itemIndex);
+    if (!item) continue;
 
-    // Indent per TOC level while keeping content within the gutter-safe region.
-    const int indentSize = contentX + 20 + (item.level - 1) * 15;
+    const int indentSize = contentX + 20 + (item->level - 1) * 15;
     const std::string chapterName =
-        renderer.truncatedText(UI_10_FONT_ID, item.title.c_str(), contentWidth - 40 - indentSize);
+        renderer.truncatedText(UI_10_FONT_ID, item->title.c_str(), contentWidth - 40 - indentSize);
 
     renderer.drawText(UI_10_FONT_ID, indentSize, displayY, chapterName.c_str(), !isSelected);
   }

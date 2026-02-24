@@ -560,8 +560,12 @@ void EpubReaderActivity::render(Activity::RenderLock&& lock) {
       std::max(SETTINGS.screenMargin, static_cast<uint8_t>(UITheme::getInstance().getStatusBarHeight()));
 
   if (!section) {
-    const auto filepath = epub->getSpineItem(currentSpineIndex).href;
-    LOG_DBG("ERS", "Loading file: %s, index: %d", filepath.c_str(), currentSpineIndex);
+    const auto spineEntry = epub->getSpineItem(currentSpineIndex);
+    if (!spineEntry) {
+      LOG_ERR("ERS", "Failed to get spine item for index: %d", currentSpineIndex);
+      return;
+    }
+    LOG_DBG("ERS", "Loading file: %s, index: %d", spineEntry->href.c_str(), currentSpineIndex);
     section = std::unique_ptr<Section>(new Section(epub, currentSpineIndex, renderer));
 
     const uint16_t viewportWidth = renderer.getScreenWidth() - orientedMarginLeft - orientedMarginRight;
@@ -739,15 +743,15 @@ void EpubReaderActivity::renderStatusBar() const {
   const float sectionChapterProg = (pageCount > 0) ? (static_cast<float>(currentPage) / pageCount) : 0;
   const float bookProgress = epub->calculateProgress(currentSpineIndex, sectionChapterProg) * 100;
 
-  const int tocIndex = epub->getTocIndexForSpineIndex(currentSpineIndex);
+  const auto tocIndex = epub->getTocIndexForSpineIndex(currentSpineIndex);
   std::string title;
 
   if (SETTINGS.statusBarTitle == CrossPointSettings::STATUS_BAR_TITLE::CHAPTER_TITLE) {
-    if (tocIndex == -1) {
+    if (!tocIndex) {
       title = tr(STR_UNNAMED);
     } else {
-      const auto tocItem = epub->getTocItem(tocIndex);
-      title = tocItem.title;
+      const auto tocItem = epub->getTocItem(*tocIndex);
+      title = tocItem ? tocItem->title : tr(STR_UNNAMED);
     }
   } else if (SETTINGS.statusBarTitle == CrossPointSettings::STATUS_BAR_TITLE::BOOK_TITLE) {
     title = epub->getTitle();

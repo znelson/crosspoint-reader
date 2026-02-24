@@ -3,6 +3,7 @@
 #include <HalStorage.h>
 
 #include <algorithm>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -19,10 +20,10 @@ class BookMetadataCache {
   struct SpineEntry {
     std::string href;
     size_t cumulativeSize;
-    int16_t tocIndex;
+    std::optional<int16_t> tocIndex;
 
-    SpineEntry() : cumulativeSize(0), tocIndex(-1) {}
-    SpineEntry(std::string href, const size_t cumulativeSize, const int16_t tocIndex)
+    SpineEntry() : cumulativeSize(0) {}
+    SpineEntry(std::string href, const size_t cumulativeSize, std::optional<int16_t> tocIndex)
         : href(std::move(href)), cumulativeSize(cumulativeSize), tocIndex(tocIndex) {}
   };
 
@@ -31,10 +32,11 @@ class BookMetadataCache {
     std::string href;
     std::string anchor;
     uint8_t level;
-    int16_t spineIndex;
+    std::optional<int16_t> spineIndex;
 
-    TocEntry() : level(0), spineIndex(-1) {}
-    TocEntry(std::string title, std::string href, std::string anchor, const uint8_t level, const int16_t spineIndex)
+    TocEntry() : level(0) {}
+    TocEntry(std::string title, std::string href, std::string anchor, const uint8_t level,
+             std::optional<int16_t> spineIndex)
         : title(std::move(title)),
           href(std::move(href)),
           anchor(std::move(anchor)),

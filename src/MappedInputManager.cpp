@@ -90,7 +90,7 @@ MappedInputManager::Labels MappedInputManager::mapLabels(const char* back, const
           labelForHardware(HalGPIO::BTN_LEFT), labelForHardware(HalGPIO::BTN_RIGHT)};
 }
 
-int MappedInputManager::getPressedFrontButton() const {
+std::optional<int> MappedInputManager::getPressedFrontButton() const {
   // Scan the raw front buttons in hardware order.
   // This bypasses remapping so the remap activity can capture physical presses.
   if (gpio.wasPressed(HalGPIO::BTN_BACK)) {
@@ -105,5 +105,5 @@ int MappedInputManager::getPressedFrontButton() const {
   if (gpio.wasPressed(HalGPIO::BTN_RIGHT)) {
     return HalGPIO::BTN_RIGHT;
   }
-  return -1;
+  return std::nullopt;
 }

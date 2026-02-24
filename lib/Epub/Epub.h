@@ -3,6 +3,7 @@
 #include <Print.h>
 
 #include <memory>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -60,12 +61,12 @@ class Epub {
                                    bool trailingNullByte = false) const;
   bool readItemContentsToStream(const std::string& itemHref, Print& out, size_t chunkSize) const;
   bool getItemSize(const std::string& itemHref, size_t* size) const;
-  BookMetadataCache::SpineEntry getSpineItem(int spineIndex) const;
-  BookMetadataCache::TocEntry getTocItem(int tocIndex) const;
+  std::optional<BookMetadataCache::SpineEntry> getSpineItem(int spineIndex) const;
+  std::optional<BookMetadataCache::TocEntry> getTocItem(int tocIndex) const;
   int getSpineItemsCount() const;
   int getTocItemsCount() const;
-  int getSpineIndexForTocIndex(int tocIndex) const;
-  int getTocIndexForSpineIndex(int spineIndex) const;
+  std::optional<int> getSpineIndexForTocIndex(int tocIndex) const;
+  std::optional<int> getTocIndexForSpineIndex(int spineIndex) const;
   size_t getCumulativeSpineItemSize(int spineIndex) const;
   int getSpineIndexForTextReference() const;
 
