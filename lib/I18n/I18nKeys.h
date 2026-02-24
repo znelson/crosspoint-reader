@@ -361,6 +361,9 @@ enum class StrId : uint16_t {
   STR_BOOK_S_STYLE,
   STR_EMBEDDED_STYLE,
   STR_OPDS_SERVER_URL,
+  STR_FOOTNOTES,
+  STR_NO_FOOTNOTES,
+  STR_LINK,
   STR_SCREENSHOT_BUTTON,
   // Sentinel - must be last
   _COUNT
