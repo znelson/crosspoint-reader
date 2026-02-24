@@ -6,6 +6,7 @@
 #include <functional>
 #include <map>
 #include <memory>
+#include <set>
 #include <string>
 
 #include "../ParsedText.h"
@@ -71,6 +72,7 @@ class ChapterHtmlSlimParser {
   // Anchor-to-page mapping: tracks which page each HTML id attribute lands on
   int completedPageCount = 0;
   std::map<std::string, uint16_t> anchorPageMap;
+  std::set<std::string> tocAnchors;
 
   void updateEffectiveInlineStyle();
   void startNewTextBlock(const BlockStyle& blockStyle);
@@ -89,7 +91,8 @@ class ChapterHtmlSlimParser {
                                  const uint16_t viewportHeight, const bool hyphenationEnabled,
                                  const std::function<void(std::unique_ptr<Page>)>& completePageFn,
                                  const bool embeddedStyle, const std::string& contentBase,
-                                 const std::string& imageBasePath, const std::function<void()>& popupFn = nullptr,
+                                 const std::string& imageBasePath, std::set<std::string> tocAnchors = {},
+                                 const std::function<void()>& popupFn = nullptr,
                                  const CssParser* cssParser = nullptr)
 
       : epub(epub),
@@ -107,7 +110,8 @@ class ChapterHtmlSlimParser {
         cssParser(cssParser),
         embeddedStyle(embeddedStyle),
         contentBase(contentBase),
-        imageBasePath(imageBasePath) {}
+        imageBasePath(imageBasePath),
+        tocAnchors(std::move(tocAnchors)) {}
 
   ~ChapterHtmlSlimParser() = default;
   bool parseAndBuildPages();

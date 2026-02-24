@@ -5,6 +5,7 @@
 #include <Serialization.h>
 
 #include <algorithm>
+#include <set>
 
 #include "Epub/css/CssParser.h"
 #include "Page.h"
@@ -200,11 +201,21 @@ bool Section::createSectionFile(const int fontId, const float lineCompression, c
     }
   }
 
+  // Collect TOC anchors for this spine so the parser can insert page breaks at chapter boundaries
+  std::set<std::string> tocAnchors;
+  const int tocCount = epub->getTocItemsCount();
+  for (int i = 0; i < tocCount; i++) {
+    auto entry = epub->getTocItem(i);
+    if (entry.spineIndex == spineIndex && !entry.anchor.empty()) {
+      tocAnchors.insert(std::move(entry.anchor));
+    }
+  }
+
   ChapterHtmlSlimParser visitor(
       epub, tmpHtmlPath, renderer, fontId, lineCompression, extraParagraphSpacing, paragraphAlignment, viewportWidth,
       viewportHeight, hyphenationEnabled,
       [this, &lut](std::unique_ptr<Page> page) { lut.emplace_back(this->onPageComplete(std::move(page))); },
-      embeddedStyle, contentBase, imageBasePath, popupFn, cssParser);
+      embeddedStyle, contentBase, imageBasePath, std::move(tocAnchors), popupFn, cssParser);
   Hyphenator::setPreferredLanguage(epub->getLanguage());
   success = visitor.parseAndBuildPages();
 

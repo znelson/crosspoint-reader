@@ -149,10 +149,17 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
   }
 
   // Record anchor AFTER any block flush so completedPageCount reflects the correct page.
+  // If this anchor is a TOC chapter boundary, start a fresh page so the chapter doesn't
+  // begin mid-page.
   const auto recordAnchor = [self, &idAttr]() {
-    if (!idAttr.empty()) {
-      self->anchorPageMap[idAttr] = static_cast<uint16_t>(self->completedPageCount);
+    if (idAttr.empty()) return;
+    if (self->tocAnchors.count(idAttr) && self->currentPage && !self->currentPage->elements.empty()) {
+      self->completePageFn(std::move(self->currentPage));
+      self->completedPageCount++;
+      self->currentPage.reset(new Page());
+      self->currentPageNextY = 0;
     }
+    self->anchorPageMap[idAttr] = static_cast<uint16_t>(self->completedPageCount);
   };
 
   auto centeredBlockStyle = BlockStyle();
