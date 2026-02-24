@@ -59,17 +59,7 @@ void EpubReaderChapterSelectionActivity::loop() {
     if (newSpineIndex == -1) {
       onGoBack();
     } else {
-      const auto anchor = epub->getAnchorForTocIndex(selectorIndex);
-      if (!anchor.empty()) {
-        const int anchorPage = epub->getPageForAnchor(newSpineIndex, anchor);
-        if (anchorPage >= 0) {
-          onSelectPosition(newSpineIndex, anchorPage, "");
-        } else {
-          onSelectPosition(newSpineIndex, 0, anchor);
-        }
-      } else {
-        onSelectPosition(newSpineIndex, 0, "");
-      }
+      onSelectPosition(newSpineIndex, selectorIndex);
     }
   } else if (mappedInput.wasReleased(MappedInputManager::Button::Back)) {
     onGoBack();

@@ -58,9 +58,9 @@ void Section::writeSectionFileHeader(const int fontId, const float lineCompressi
   serialization::writePod(file, viewportHeight);
   serialization::writePod(file, hyphenationEnabled);
   serialization::writePod(file, embeddedStyle);
-  serialization::writePod(file, pageCount);  // Placeholder for page count (will be initially 0, updated later)
-  serialization::writePod(file, static_cast<uint32_t>(0));  // Placeholder for LUT offset (updated later)
-  serialization::writePod(file, static_cast<uint32_t>(0));  // Placeholder for anchor map offset (updated later)
+  serialization::writePod(file, pageCount);  // Placeholder for page count (will be initially 0, patched later)
+  serialization::writePod(file, static_cast<uint32_t>(0));  // Placeholder for LUT offset (patched later)
+  serialization::writePod(file, static_cast<uint32_t>(0));  // Placeholder for anchor map offset (patched later)
 }
 
 bool Section::loadSectionFile(const int fontId, const float lineCompression, const bool extraParagraphSpacing,
@@ -111,7 +111,7 @@ bool Section::loadSectionFile(const int fontId, const float lineCompression, con
   serialization::readPod(file, pageCount);
   file.close();
   LOG_DBG("SCT", "Deserialization succeeded: %d pages", pageCount);
-  loadTocBoundaries();
+  buildTocBoundaries(readAnchorMap(filePath));
   return true;
 }
 
@@ -254,13 +254,11 @@ bool Section::createSectionFile(const int fontId, const float lineCompression, c
 
   // Write anchor-to-page map for TOC fragment navigation
   const uint32_t anchorMapOffset = file.position();
-  {
-    const auto& anchorMap = visitor.getAnchorPageMap();
-    serialization::writePod(file, static_cast<uint16_t>(anchorMap.size()));
-    for (const auto& pair : anchorMap) {
-      serialization::writeString(file, pair.first);
-      serialization::writePod(file, pair.second);
-    }
+  const auto& anchorMap = visitor.getAnchorPageMap();
+  serialization::writePod(file, static_cast<uint16_t>(anchorMap.size()));
+  for (const auto& [anchor, page] : anchorMap) {
+    serialization::writeString(file, anchor);
+    serialization::writePod(file, page);
   }
 
   // Patch header with final pageCount, lutOffset, and anchorMapOffset
@@ -272,7 +270,8 @@ bool Section::createSectionFile(const int fontId, const float lineCompression, c
   if (cssParser) {
     cssParser->clear();
   }
-  loadTocBoundaries();
+
+  buildTocBoundaries(anchorMap);
   return true;
 }
 
@@ -324,39 +323,21 @@ std::map<std::string, uint16_t> Section::readAnchorMap(const std::string& sectio
   return result;
 }
 
-int Section::getPageForAnchor(const std::string& cachePath, const int spineIndex, const std::string& anchor) {
-  if (anchor.empty()) {
-    return -1;
-  }
-
-  const auto path = cachePath + "/sections/" + std::to_string(spineIndex) + ".bin";
-  const auto anchorMap = readAnchorMap(path);
-  auto it = anchorMap.find(anchor);
-  return it != anchorMap.end() ? static_cast<int>(it->second) : -1;
-}
-
-void Section::loadTocBoundaries() {
+void Section::buildTocBoundaries(const std::map<std::string, uint16_t>& anchorMap) {
   const int startTocIndex = epub->getTocIndexForSpineIndex(spineIndex);
   if (startTocIndex < 0) return;
 
-  const auto anchorMap = readAnchorMap(filePath);
-
-  // Scan forward from the spine's primary TOC index to collect all entries for this spine
   const int tocCount = epub->getTocItemsCount();
   for (int i = startTocIndex; i < tocCount; i++) {
     const auto entry = epub->getTocItem(i);
     if (entry.spineIndex != spineIndex) break;
-
     uint16_t page = 0;
     if (!entry.anchor.empty()) {
       auto it = anchorMap.find(entry.anchor);
-      if (it != anchorMap.end()) {
-        page = it->second;
-      }
+      if (it != anchorMap.end()) page = it->second;
     }
     tocBoundaries.push_back({i, page});
   }
-
   std::sort(tocBoundaries.begin(), tocBoundaries.end(),
             [](const TocBoundary& a, const TocBoundary& b) { return a.startPage < b.startPage; });
 }
@@ -375,11 +356,11 @@ int Section::getTocIndexForPage(const int page) const {
   return std::prev(it)->tocIndex;
 }
 
-int Section::getPageForTocIndex(const int tocIndex) const {
+std::optional<int> Section::getPageForTocIndex(const int tocIndex) const {
   for (const auto& boundary : tocBoundaries) {
     if (boundary.tocIndex == tocIndex) {
       return boundary.startPage;
     }
   }
-  return -1;
+  return std::nullopt;
 }

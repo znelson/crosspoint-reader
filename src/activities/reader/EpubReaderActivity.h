@@ -2,6 +2,8 @@
 #include <Epub.h>
 #include <Epub/Section.h>
 
+#include <optional>
+
 #include "EpubReaderMenuActivity.h"
 #include "activities/ActivityWithSubactivity.h"
 
@@ -10,7 +12,9 @@ class EpubReaderActivity final : public ActivityWithSubactivity {
   std::unique_ptr<Section> section = nullptr;
   int currentSpineIndex = 0;
   int nextPageNumber = 0;
-  std::string pendingAnchor;
+  // Set when navigating to a TOC entry in a different spine (chapter skip or chapter selector).
+  // Cleared on the next render after the new section loads and resolves it to a page.
+  std::optional<int> pendingTocIndex;
   int pagesUntilFullRefresh = 0;
   int cachedSpineIndex = 0;
   int cachedChapterTotalPageCount = 0;

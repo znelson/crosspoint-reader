@@ -233,11 +233,9 @@ void EpubReaderActivity::loop() {
           const int newSpineIndex = epub->getSpineIndexForTocIndex(nextTocIndex);
 
           if (newSpineIndex == currentSpineIndex) {
-            const int resolved = section->getPageForTocIndex(nextTocIndex);
-            section->currentPage = resolved >= 0 ? resolved : 0;
+            section->currentPage = section->getPageForTocIndex(nextTocIndex).value_or(0);
           } else {
-            const auto anchor = epub->getAnchorForTocIndex(nextTocIndex);
-            pendingAnchor = anchor;
+            pendingTocIndex = nextTocIndex;
             nextPageNumber = 0;
             currentSpineIndex = newSpineIndex;
             section.reset();
@@ -385,11 +383,15 @@ void EpubReaderActivity::onReaderMenuConfirm(EpubReaderMenuActivity::MenuAction 
             exitActivity();
             requestUpdate();
           },
-          [this](const int newSpineIndex, const int newPage, const std::string& anchor) {
-            pendingAnchor = anchor;
-            if (currentSpineIndex != newSpineIndex || (section && section->currentPage != newPage) || !anchor.empty()) {
+          [this](const int newSpineIndex, const int tocIndex) {
+            auto resolvedPage =
+                (newSpineIndex == currentSpineIndex && section) ? section->getPageForTocIndex(tocIndex) : std::nullopt;
+            if (resolvedPage) {
+              section->currentPage = *resolvedPage;
+            } else {
+              pendingTocIndex = tocIndex;
               currentSpineIndex = newSpineIndex;
-              nextPageNumber = newPage;
+              nextPageNumber = 0;
               section.reset();
             }
             exitActivity();
@@ -589,12 +591,11 @@ void EpubReaderActivity::render(Activity::RenderLock&& lock) {
       section->currentPage = nextPageNumber;
     }
 
-    if (!pendingAnchor.empty()) {
-      const int resolvedPage = epub->getPageForAnchor(currentSpineIndex, pendingAnchor);
-      if (resolvedPage >= 0) {
-        section->currentPage = resolvedPage;
+    if (pendingTocIndex) {
+      if (const auto resolvedPage = section->getPageForTocIndex(*pendingTocIndex)) {
+        section->currentPage = *resolvedPage;
       }
-      pendingAnchor.clear();
+      pendingTocIndex.reset();
     }
 
     // handles changes in reader settings and reset to approximate position based on cached progress

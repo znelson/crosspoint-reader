@@ -2,6 +2,7 @@
 #include <functional>
 #include <map>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -28,8 +29,8 @@ class Section {
   };
   std::vector<TocBoundary> tocBoundaries;
 
-  void loadTocBoundaries();
   static std::map<std::string, uint16_t> readAnchorMap(const std::string& sectionPath);
+  void buildTocBoundaries(const std::map<std::string, uint16_t>& anchorMap);
 
  public:
   uint16_t pageCount = 0;
@@ -49,11 +50,9 @@ class Section {
                          const std::function<void()>& popupFn = nullptr);
   std::unique_ptr<Page> loadPageFromSectionFile();
 
-  // Look up which page an anchor (HTML id) maps to. Returns -1 if not found.
-  static int getPageForAnchor(const std::string& cachePath, int spineIndex, const std::string& anchor);
-
   // Given a page in this section, return the TOC index for that page.
   int getTocIndexForPage(int page) const;
-  // Given a TOC index, return the start page in this section. Returns -1 if not found.
-  int getPageForTocIndex(int tocIndex) const;
+  // Given a TOC index, return the start page in this section.
+  // Returns nullopt if the TOC index doesn't map to a boundary in this spine (e.g. belongs to a different spine).
+  std::optional<int> getPageForTocIndex(int tocIndex) const;
 };
