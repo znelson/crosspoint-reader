@@ -812,9 +812,11 @@ int Epub::getSpineIndexForTocIndex(const int tocIndex) const {
 
 std::string Epub::getAnchorForTocIndex(const int tocIndex) const {
   if (!bookMetadataCache || !bookMetadataCache->isLoaded()) {
+    LOG_ERR("EBP", "getAnchorForTocIndex called but cache not loaded");
     return "";
   }
   if (tocIndex < 0 || tocIndex >= bookMetadataCache->getTocCount()) {
+    LOG_ERR("EBP", "getAnchorForTocIndex: tocIndex %d out of range", tocIndex);
     return "";
   }
   return bookMetadataCache->getTocEntry(tocIndex).anchor;

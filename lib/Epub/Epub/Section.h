@@ -23,11 +23,13 @@ class Section {
   uint32_t onPageComplete(std::unique_ptr<Page> page);
 
   struct TocBoundary {
-    int tocIndex;
-    uint16_t startPage;
+    int tocIndex = 0;
+    uint16_t startPage = 0;
   };
   std::vector<TocBoundary> tocBoundaries;
-  bool tocBoundariesLoaded = false;
+
+  void loadTocBoundaries();
+  static std::map<std::string, uint16_t> readAnchorMap(const std::string& sectionPath);
 
  public:
   uint16_t pageCount = 0;
@@ -49,11 +51,9 @@ class Section {
 
   // Look up which page an anchor (HTML id) maps to. Returns -1 if not found.
   static int getPageForAnchor(const std::string& cachePath, int spineIndex, const std::string& anchor);
-  // Read the serialized anchor map from a section file into the provided map.
-  static bool readAnchorMap(const std::string& sectionPath, std::map<std::string, uint16_t>& out);
 
-  // Build TOC boundary data for this spine (call once after section is loaded).
-  void loadTocBoundaries();
   // Given a page in this section, return the TOC index for that page.
   int getTocIndexForPage(int page) const;
+  // Given a TOC index, return the start page in this section. Returns -1 if not found.
+  int getPageForTocIndex(int tocIndex) const;
 };

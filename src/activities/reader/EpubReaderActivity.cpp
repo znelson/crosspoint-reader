@@ -226,28 +226,19 @@ void EpubReaderActivity::loop() {
       RenderLock lock(*this);
 
       if (section && section->pageCount > 0) {
-        section->loadTocBoundaries();
         const int curTocIndex = section->getTocIndexForPage(section->currentPage);
         const int nextTocIndex = nextTriggered ? curTocIndex + 1 : curTocIndex - 1;
 
         if (nextTocIndex >= 0 && nextTocIndex < epub->getTocItemsCount()) {
           const int newSpineIndex = epub->getSpineIndexForTocIndex(nextTocIndex);
-          const auto anchor = epub->getAnchorForTocIndex(nextTocIndex);
-          int targetPage = 0;
-          bool anchorResolved = anchor.empty();
-          if (!anchor.empty()) {
-            const int resolved = epub->getPageForAnchor(newSpineIndex, anchor);
-            if (resolved >= 0) {
-              targetPage = resolved;
-              anchorResolved = true;
-            }
-          }
 
           if (newSpineIndex == currentSpineIndex) {
-            section->currentPage = targetPage;
+            const int resolved = section->getPageForTocIndex(nextTocIndex);
+            section->currentPage = resolved >= 0 ? resolved : 0;
           } else {
-            nextPageNumber = targetPage;
-            pendingAnchor = anchorResolved ? "" : anchor;
+            const auto anchor = epub->getAnchorForTocIndex(nextTocIndex);
+            pendingAnchor = anchor;
+            nextPageNumber = 0;
             currentSpineIndex = newSpineIndex;
             section.reset();
           }
@@ -626,8 +617,6 @@ void EpubReaderActivity::render(Activity::RenderLock&& lock) {
       section->currentPage = newPage;
       pendingPercentJump = false;
     }
-
-    section->loadTocBoundaries();
   }
 
   renderer.clearScreen();

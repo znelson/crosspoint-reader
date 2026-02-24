@@ -588,6 +588,7 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
     }
   }
 
+  // Unprocessed tag, just increasing depth and continue forward
   recordAnchor();
   self->depth += 1;
 }
