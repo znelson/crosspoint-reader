@@ -920,10 +920,10 @@ void EpubReaderActivity::ensureChapterCached(const uint16_t viewportWidth, const
 }
 
 int EpubReaderActivity::getChapterRelativePage() const {
-  for (const auto& seg : chapterPageInfo.segments) {
-    if (seg.spineIndex == currentSpineIndex) {
-      return seg.cumulativeOffset + (section->currentPage - seg.startPage);
-    }
+  const auto it = std::find_if(chapterPageInfo.segments.begin(), chapterPageInfo.segments.end(),
+                               [this](const SpineSegment& seg) { return seg.spineIndex == currentSpineIndex; });
+  if (it != chapterPageInfo.segments.end()) {
+    return it->cumulativeOffset + (section->currentPage - it->startPage);
   }
   return section ? section->currentPage : 0;
 }
