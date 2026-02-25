@@ -247,10 +247,15 @@ void EpubReaderActivity::loop() {
             currentSpineIndex = newSpineIndex;
             section.reset();
           }
-        } else {
-          // Beyond TOC bounds — fall back to spine-level skip
+        } else if (nextTriggered) {
+          // Beyond last TOC entry, go to end of book
           nextPageNumber = 0;
-          currentSpineIndex = nextTriggered ? currentSpineIndex + 1 : currentSpineIndex - 1;
+          currentSpineIndex = epub->getSpineItemsCount();
+          section.reset();
+        } else {
+          // Before first TOC entry, skip to spine before the current chapter
+          nextPageNumber = 0;
+          currentSpineIndex = epub->getTocItem(curTocIndex).spineIndex - 1;
           section.reset();
         }
       } else {
