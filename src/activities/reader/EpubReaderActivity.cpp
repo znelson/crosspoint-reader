@@ -235,7 +235,12 @@ void EpubReaderActivity::loop() {
           const int newSpineIndex = epub->getSpineIndexForTocIndex(nextTocIndex);
 
           if (newSpineIndex == currentSpineIndex) {
-            section->currentPage = section->getPageForTocIndex(nextTocIndex).value_or(0);
+            if (const auto resolvedPage = section->getPageForTocIndex(nextTocIndex)) {
+              section->currentPage = *resolvedPage;
+            } else {
+              LOG_DBG("ERS", "No page boundary for TOC %d in spine %d, staying on current page", nextTocIndex,
+                      currentSpineIndex);
+            }
           } else {
             pendingTocIndex = nextTocIndex;
             nextPageNumber = 0;
