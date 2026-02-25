@@ -227,8 +227,20 @@ void EpubReaderActivity::loop() {
     // We don't want to delete the section mid-render, so grab the semaphore
     {
       RenderLock lock(*this);
+
+      const int curTocIndex = epub->getTocIndexForSpineIndex(currentSpineIndex);
+      const int nextTocIndex = nextTriggered ? curTocIndex + 1 : curTocIndex - 1;
+
+      if (nextTocIndex >= 0 && nextTocIndex < epub->getTocItemsCount()) {
+        currentSpineIndex = epub->getSpineIndexForTocIndex(nextTocIndex);
+      } else if (nextTriggered) {
+        // Beyond last TOC entry — go to end of book
+        currentSpineIndex = epub->getSpineItemsCount();
+      } else {
+        // Before first TOC entry — skip to spine before the current chapter
+        currentSpineIndex = epub->getTocItem(curTocIndex).spineIndex - 1;
+      }
       nextPageNumber = 0;
-      currentSpineIndex = nextTriggered ? currentSpineIndex + 1 : currentSpineIndex - 1;
       section.reset();
     }
     requestUpdate();
