@@ -103,6 +103,13 @@ class ChapterHtmlSlimParser {
         contentBase(contentBase),
         imageBasePath(imageBasePath) {}
 
+#ifdef BENCHMARK_MODE
+  uint32_t benchCssResolveUs = 0;
+  uint32_t benchCssResolveCount = 0;
+  uint32_t benchLayoutUs = 0;
+  uint32_t benchLayoutCount = 0;
+#endif
+
   ~ChapterHtmlSlimParser() = default;
   bool parseAndBuildPages();
   void addLineToPage(std::shared_ptr<TextBlock> line);

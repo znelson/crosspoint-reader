@@ -433,6 +433,9 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
   // Compute CSS style for this element
   CssStyle cssStyle;
   if (self->cssParser) {
+#ifdef BENCHMARK_MODE
+    uint32_t cssStart = micros();
+#endif
     // Get combined tag + class styles
     cssStyle = self->cssParser->resolveStyle(name, classAttr);
     // Merge inline style (highest priority)
@@ -440,6 +443,10 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
       CssStyle inlineStyle = CssParser::parseInlineStyle(styleAttr);
       cssStyle.applyOver(inlineStyle);
     }
+#ifdef BENCHMARK_MODE
+    self->benchCssResolveUs += micros() - cssStart;
+    self->benchCssResolveCount++;
+#endif
   }
 
   const float emSize = static_cast<float>(self->renderer.getLineHeight(self->fontId)) * self->lineCompression;
@@ -844,7 +851,11 @@ bool ChapterHtmlSlimParser::parseAndBuildPages() {
   XML_SetCharacterDataHandler(parser, characterData);
 
   // Compute the time taken to parse and build pages
-  const uint32_t chapterStartTime = millis();
+#ifdef BENCHMARK_MODE
+  const uint32_t chapterStartUs = micros();
+#else
+  const uint32_t chapterStartMs = millis();
+#endif
   do {
     void* const buf = XML_GetBuffer(parser, PARSE_BUFFER_SIZE);
     if (!buf) {
@@ -882,7 +893,16 @@ bool ChapterHtmlSlimParser::parseAndBuildPages() {
       return false;
     }
   } while (!done);
-  LOG_DBG("EHP", "Time to parse and build pages: %lu ms", millis() - chapterStartTime);
+#ifdef BENCHMARK_MODE
+  LOG_INF("EHP", "Time to parse and build pages: %lu us", micros() - chapterStartUs);
+#else
+  LOG_DBG("EHP", "Time to parse and build pages: %lu ms", millis() - chapterStartMs);
+#endif
+#ifdef BENCHMARK_MODE
+  LOG_INF("BENCH", "[PARSE_DETAIL] css_resolve=%lu us (%lu calls) layout=%lu us (%lu calls)",
+          static_cast<unsigned long>(benchCssResolveUs), static_cast<unsigned long>(benchCssResolveCount),
+          static_cast<unsigned long>(benchLayoutUs), static_cast<unsigned long>(benchLayoutCount));
+#endif
 
   XML_StopParser(parser, XML_FALSE);                // Stop any pending processing
   XML_SetElementHandler(parser, nullptr, nullptr);  // Clear callbacks
@@ -943,9 +963,16 @@ void ChapterHtmlSlimParser::makePages() {
   const uint16_t effectiveWidth =
       (horizontalInset < viewportWidth) ? static_cast<uint16_t>(viewportWidth - horizontalInset) : viewportWidth;
 
+#ifdef BENCHMARK_MODE
+  uint32_t layoutStart = micros();
+#endif
   currentTextBlock->layoutAndExtractLines(
       renderer, fontId, effectiveWidth,
       [this](const std::shared_ptr<TextBlock>& textBlock) { addLineToPage(textBlock); });
+#ifdef BENCHMARK_MODE
+  benchLayoutUs += micros() - layoutStart;
+  benchLayoutCount++;
+#endif
 
   // Apply bottom spacing after the paragraph (stored in pixels)
   if (blockStyle.marginBottom > 0) {

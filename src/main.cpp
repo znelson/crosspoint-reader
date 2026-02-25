@@ -33,6 +33,11 @@
 #include "util/ButtonNavigator.h"
 #include "util/ScreenshotUtil.h"
 
+#ifdef BENCHMARK_MODE
+#include "benchmark/BenchmarkAllocTracker.h"
+#include "benchmark/BenchmarkState.h"
+#endif
+
 HalDisplay display;
 HalGPIO gpio;
 MappedInputManager mappedInputManager(gpio);
@@ -254,6 +259,12 @@ void onGoToBrowser() {
 
 void onGoHome() {
   exitActivity();
+#ifdef BENCHMARK_MODE
+  if (BenchmarkState::pendingReopen) {
+    onGoToReader(BenchmarkState::bookPath);
+    return;
+  }
+#endif
   enterNewActivity(new HomeActivity(renderer, mappedInputManager, onGoToReader, onGoToMyLibrary, onGoToRecentBooks,
                                     onGoToSettings, onGoToFileTransfer, onGoToBrowser));
 }
@@ -396,6 +407,32 @@ void loop() {
         logSerial.write(buf, HalDisplay::BUFFER_SIZE);
         logSerial.printf("SCREENSHOT_END\n");
       }
+#ifdef BENCHMARK_MODE
+      else if (cmd.startsWith("BENCHMARK")) {
+        String arg = cmd.substring(9);
+        arg.trim();
+        if (arg.length() == 0) {
+          LOG_ERR("BENCH", "Usage: CMD:BENCHMARK <book_path> [page_count]");
+        } else {
+          // Parse optional page count: "CMD:BENCHMARK /path/to/book.epub 100"
+          int spaceIdx = arg.indexOf(' ');
+          if (spaceIdx > 0) {
+            BenchmarkState::bookPath = std::string(arg.substring(0, spaceIdx).c_str());
+            BenchmarkState::pageTurnCount = arg.substring(spaceIdx + 1).toInt();
+            if (BenchmarkState::pageTurnCount <= 0) {
+              BenchmarkState::pageTurnCount = BenchmarkState::DEFAULT_PAGE_TURNS;
+            }
+          } else {
+            BenchmarkState::bookPath = std::string(arg.c_str());
+            BenchmarkState::pageTurnCount = BenchmarkState::DEFAULT_PAGE_TURNS;
+          }
+          BenchmarkState::requested = true;
+          LOG_INF("BENCH", "Benchmark requested: path=%s pages=%d", BenchmarkState::bookPath.c_str(),
+                  BenchmarkState::pageTurnCount);
+          onGoToReader(BenchmarkState::bookPath);
+        }
+      }
+#endif
     }
   }
 
@@ -421,7 +458,11 @@ void loop() {
   }
 
   const unsigned long sleepTimeoutMs = SETTINGS.getSleepTimeoutMs();
-  if (millis() - lastActivityTime >= sleepTimeoutMs) {
+  if (millis() - lastActivityTime >= sleepTimeoutMs
+#ifdef BENCHMARK_MODE
+      && !BenchmarkState::requested
+#endif
+  ) {
     LOG_DBG("SLP", "Auto-sleep triggered after %lu ms of inactivity", sleepTimeoutMs);
     enterDeepSleep();
     // This should never be hit as `enterDeepSleep` calls esp_deep_sleep_start

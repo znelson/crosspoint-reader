@@ -21,6 +21,12 @@
 #include "fontIds.h"
 #include "util/ScreenshotUtil.h"
 
+#ifdef BENCHMARK_MODE
+#include "benchmark/BenchmarkAllocTracker.h"
+#include "benchmark/BenchmarkState.h"
+#include "benchmark/EpubBenchmarkDriver.h"
+#endif
+
 namespace {
 // pagesPerRefresh now comes from SETTINGS.getRefreshFrequency()
 constexpr unsigned long skipChapterMs = 700;
@@ -58,6 +64,8 @@ void applyReaderOrientation(GfxRenderer& renderer, const uint8_t orientation) {
 }
 
 }  // namespace
+
+EpubReaderActivity::~EpubReaderActivity() = default;
 
 void EpubReaderActivity::onEnter() {
   ActivityWithSubactivity::onEnter();
@@ -102,6 +110,18 @@ void EpubReaderActivity::onEnter() {
   APP_STATE.saveToFile();
   RECENT_BOOKS.addBook(epub->getPath(), epub->getTitle(), epub->getAuthor(), epub->getThumbBmpPath());
 
+#ifdef BENCHMARK_MODE
+  if (BenchmarkState::requested) {
+    benchmarkDriver.reset(new EpubBenchmarkDriver(*this));
+    if (BenchmarkState::pendingReopen) {
+      benchmarkDriver->startWarmReopen();
+    } else {
+      benchmarkDriver->start();
+    }
+    return;
+  }
+#endif
+
   // Trigger first update
   requestUpdate();
 }
@@ -119,6 +139,20 @@ void EpubReaderActivity::onExit() {
 }
 
 void EpubReaderActivity::loop() {
+#ifdef BENCHMARK_MODE
+  if (benchmarkDriver) {
+    benchmarkDriver->loop();
+    if (pendingGoHome) {
+      pendingGoHome = false;
+      benchmarkDriver.reset();
+      if (onGoHome) {
+        onGoHome();
+      }
+    }
+    return;
+  }
+#endif
+
   // Pass input responsibility to sub activity if exists
   if (subActivity) {
     subActivity->loop();
@@ -571,6 +605,13 @@ void EpubReaderActivity::render(Activity::RenderLock&& lock) {
                                   SETTINGS.extraParagraphSpacing, SETTINGS.paragraphAlignment, viewportWidth,
                                   viewportHeight, SETTINGS.hyphenationEnabled, SETTINGS.embeddedStyle)) {
       LOG_DBG("ERS", "Cache not found, building...");
+#ifdef BENCHMARK_MODE
+      LOG_INF("BENCH", "[CACHE] spine=%d result=miss", currentSpineIndex);
+#endif
+
+#ifdef BENCHMARK_MODE
+      auto heapBefore = BenchmarkAllocTracker::takeHeapSnapshot();
+#endif
 
       const auto popupFn = [this]() { GUI.drawPopup(renderer, tr(STR_INDEXING)); };
 
@@ -581,8 +622,20 @@ void EpubReaderActivity::render(Activity::RenderLock&& lock) {
         section.reset();
         return;
       }
+
+#ifdef BENCHMARK_MODE
+      {
+        auto heapAfter = BenchmarkAllocTracker::takeHeapSnapshot();
+        char label[32];
+        snprintf(label, sizeof(label), "section_%d_parse", currentSpineIndex);
+        BenchmarkAllocTracker::logHeapDelta(label, heapBefore, heapAfter);
+      }
+#endif
     } else {
       LOG_DBG("ERS", "Cache found, skipping build...");
+#ifdef BENCHMARK_MODE
+      LOG_INF("BENCH", "[CACHE] spine=%d result=hit", currentSpineIndex);
+#endif
     }
 
     if (nextPageNumber == UINT16_MAX) {
@@ -641,9 +694,18 @@ void EpubReaderActivity::render(Activity::RenderLock&& lock) {
       // TODO: prevent infinite loop if the page keeps failing to load for some reason
       return;
     }
-    const auto start = millis();
+#ifdef BENCHMARK_MODE
+    const auto startUs = micros();
+#else
+    const auto startMs = millis();
+#endif
     renderContents(std::move(p), orientedMarginTop, orientedMarginRight, orientedMarginBottom, orientedMarginLeft);
-    LOG_DBG("ERS", "Rendered page in %dms", millis() - start);
+#ifdef BENCHMARK_MODE
+    const char* phase = (benchmarkDriver && benchmarkDriver->isWarmRender()) ? "warm" : "cold";
+    LOG_INF("ERS", "Rendered %s page in %lu us", phase, micros() - startUs);
+#else
+    LOG_DBG("ERS", "Rendered page in %lu ms", millis() - startMs);
+#endif
     renderer.clearFontCache();
   }
   saveProgress(currentSpineIndex, section->currentPage, section->pageCount);

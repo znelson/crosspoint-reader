@@ -18,4 +18,6 @@ class ActivityWithSubactivity : public Activity {
   // the subactivity should request its own renders. This pauses parent rendering until exit.
   void requestUpdate() override;
   void onExit() override;
+  bool skipLoopDelay() override { return subActivity && subActivity->skipLoopDelay(); }
+  bool preventAutoSleep() override { return subActivity && subActivity->preventAutoSleep(); }
 };

@@ -5,6 +5,10 @@
 #include "EpubReaderMenuActivity.h"
 #include "activities/ActivityWithSubactivity.h"
 
+#ifdef BENCHMARK_MODE
+#include "benchmark/EpubBenchmarkDriver.h"
+#endif
+
 class EpubReaderActivity final : public ActivityWithSubactivity {
   std::shared_ptr<Epub> epub;
   std::unique_ptr<Section> section = nullptr;
@@ -35,6 +39,11 @@ class EpubReaderActivity final : public ActivityWithSubactivity {
   void onReaderMenuConfirm(EpubReaderMenuActivity::MenuAction action);
   void applyOrientation(uint8_t orientation);
 
+#ifdef BENCHMARK_MODE
+  friend class EpubBenchmarkDriver;
+  std::unique_ptr<EpubBenchmarkDriver> benchmarkDriver;
+#endif
+
  public:
   explicit EpubReaderActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, std::unique_ptr<Epub> epub,
                               const std::function<void()>& onGoBack, const std::function<void()>& onGoHome)
@@ -42,8 +51,13 @@ class EpubReaderActivity final : public ActivityWithSubactivity {
         epub(std::move(epub)),
         onGoBack(onGoBack),
         onGoHome(onGoHome) {}
+  ~EpubReaderActivity() override;
   void onEnter() override;
   void onExit() override;
   void loop() override;
   void render(Activity::RenderLock&& lock) override;
+#ifdef BENCHMARK_MODE
+  bool skipLoopDelay() override { return benchmarkDriver != nullptr; }
+  bool preventAutoSleep() override { return benchmarkDriver != nullptr; }
+#endif
 };

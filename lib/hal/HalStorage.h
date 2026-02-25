@@ -42,10 +42,28 @@ class HalStorage {
 
   static HalStorage& getInstance() { return instance; }
 
+#ifdef BENCHMARK_MODE
+  struct SdIoCounters {
+    uint32_t readOpens;
+    uint32_t writeOpens;
+    uint32_t existsCalls;
+    uint32_t removeCalls;
+    uint32_t readTimeUs;
+    uint32_t writeTimeUs;
+  };
+
+  void resetSdIoCounters();
+  SdIoCounters getSdIoCounters() const;
+#endif
+
  private:
   static HalStorage instance;
 
   bool initialized = false;
+
+#ifdef BENCHMARK_MODE
+  SdIoCounters sdIoCounters = {};
+#endif
 };
 
 #define Storage HalStorage::getInstance()
