@@ -56,7 +56,7 @@ bool isCssWhitespace(const char c) { return c == ' ' || c == '\t' || c == '\n' |
 
 // String utilities implementation
 
-std::string CssParser::normalized(const std::string& s) {
+std::string CssParser::normalized(const std::string_view s) {
   std::string result;
   result.reserve(s.size());
 
@@ -80,7 +80,7 @@ std::string CssParser::normalized(const std::string& s) {
   return result;
 }
 
-void CssParser::normalizedInto(const std::string& s, std::string& out) {
+void CssParser::normalizedInto(const std::string_view s, std::string& out) {
   out.clear();
   out.reserve(s.size());
 
@@ -102,16 +102,15 @@ void CssParser::normalizedInto(const std::string& s, std::string& out) {
   }
 }
 
-std::vector<std::string> CssParser::splitOnChar(const std::string& s, const char delimiter) {
+std::vector<std::string> CssParser::splitOnChar(const std::string_view s, const char delimiter) {
   std::vector<std::string> parts;
   size_t start = 0;
 
   for (size_t i = 0; i <= s.size(); ++i) {
     if (i == s.size() || s[i] == delimiter) {
-      std::string part = s.substr(start, i - start);
-      std::string trimmed = normalized(part);
+      std::string trimmed = normalized(s.substr(start, i - start));
       if (!trimmed.empty()) {
-        parts.push_back(trimmed);
+        parts.push_back(std::move(trimmed));
       }
       start = i + 1;
     }
@@ -119,7 +118,7 @@ std::vector<std::string> CssParser::splitOnChar(const std::string& s, const char
   return parts;
 }
 
-std::vector<std::string> CssParser::splitWhitespace(const std::string& s) {
+std::vector<std::string> CssParser::splitWhitespace(const std::string_view s) {
   std::vector<std::string> parts;
   size_t start = 0;
   bool inWord = false;
@@ -127,7 +126,7 @@ std::vector<std::string> CssParser::splitWhitespace(const std::string& s) {
   for (size_t i = 0; i <= s.size(); ++i) {
     const bool isSpace = i == s.size() || isCssWhitespace(s[i]);
     if (isSpace && inWord) {
-      parts.push_back(s.substr(start, i - start));
+      parts.emplace_back(s.substr(start, i - start));
       inWord = false;
     } else if (!isSpace && !inWord) {
       start = i;
@@ -139,7 +138,7 @@ std::vector<std::string> CssParser::splitWhitespace(const std::string& s) {
 
 // Property value interpreters
 
-CssTextAlign CssParser::interpretAlignment(const std::string& val) {
+CssTextAlign CssParser::interpretAlignment(const std::string_view val) {
   const std::string v = normalized(val);
 
   if (v == "left" || v == "start") return CssTextAlign::Left;
@@ -150,14 +149,14 @@ CssTextAlign CssParser::interpretAlignment(const std::string& val) {
   return CssTextAlign::Left;
 }
 
-CssFontStyle CssParser::interpretFontStyle(const std::string& val) {
+CssFontStyle CssParser::interpretFontStyle(const std::string_view val) {
   const std::string v = normalized(val);
 
   if (v == "italic" || v == "oblique") return CssFontStyle::Italic;
   return CssFontStyle::Normal;
 }
 
-CssFontWeight CssParser::interpretFontWeight(const std::string& val) {
+CssFontWeight CssParser::interpretFontWeight(const std::string_view val) {
   const std::string v = normalized(val);
 
   // Named values
@@ -178,7 +177,7 @@ CssFontWeight CssParser::interpretFontWeight(const std::string& val) {
   return CssFontWeight::Normal;
 }
 
-CssTextDecoration CssParser::interpretDecoration(const std::string& val) {
+CssTextDecoration CssParser::interpretDecoration(const std::string_view val) {
   const std::string v = normalized(val);
 
   // text-decoration can have multiple space-separated values
@@ -188,13 +187,13 @@ CssTextDecoration CssParser::interpretDecoration(const std::string& val) {
   return CssTextDecoration::None;
 }
 
-CssLength CssParser::interpretLength(const std::string& val) {
+CssLength CssParser::interpretLength(const std::string_view val) {
   CssLength result;
   tryInterpretLength(val, result);
   return result;
 }
 
-bool CssParser::tryInterpretLength(const std::string& val, CssLength& out) {
+bool CssParser::tryInterpretLength(const std::string_view val, CssLength& out) {
   const std::string v = normalized(val);
   if (v.empty()) {
     out = CssLength{};
@@ -210,12 +209,14 @@ bool CssParser::tryInterpretLength(const std::string& val, CssLength& out) {
     }
   }
 
-  const std::string numPart = v.substr(0, unitStart);
-  const std::string unitPart = v.substr(unitStart);
+  const std::string_view vv{v};
+  const std::string_view numPart = vv.substr(0, unitStart);
+  const std::string_view unitPart = vv.substr(unitStart);
 
   char* endPtr = nullptr;
-  const float numericValue = std::strtof(numPart.c_str(), &endPtr);
-  if (endPtr == numPart.c_str()) {
+  // v is a std::string so its data is null-terminated; numPart points into it
+  const float numericValue = std::strtof(numPart.data(), &endPtr);
+  if (endPtr == numPart.data()) {
     out = CssLength{};
     return false;  // No number parsed (e.g. auto, inherit, initial)
   }
@@ -237,10 +238,10 @@ bool CssParser::tryInterpretLength(const std::string& val, CssLength& out) {
 
 // Declaration parsing
 
-void CssParser::parseDeclarationIntoStyle(const std::string& decl, CssStyle& style, std::string& propNameBuf,
+void CssParser::parseDeclarationIntoStyle(const std::string_view decl, CssStyle& style, std::string& propNameBuf,
                                           std::string& propValueBuf) {
   const size_t colonPos = decl.find(':');
-  if (colonPos == std::string::npos || colonPos == 0) return;
+  if (colonPos == std::string_view::npos || colonPos == 0) return;
 
   normalizedInto(decl.substr(0, colonPos), propNameBuf);
   normalizedInto(decl.substr(colonPos + 1), propValueBuf);
@@ -320,7 +321,7 @@ void CssParser::parseDeclarationIntoStyle(const std::string& decl, CssStyle& sty
   }
 }
 
-CssStyle CssParser::parseDeclarations(const std::string& declBlock) {
+CssStyle CssParser::parseDeclarations(const std::string_view declBlock) {
   CssStyle style;
   std::string propNameBuf;
   std::string propValueBuf;
@@ -329,8 +330,7 @@ CssStyle CssParser::parseDeclarations(const std::string& declBlock) {
   for (size_t i = 0; i <= declBlock.size(); ++i) {
     if (i == declBlock.size() || declBlock[i] == ';') {
       if (i > start) {
-        const size_t len = i - start;
-        std::string decl = declBlock.substr(start, len);
+        const std::string_view decl = declBlock.substr(start, i - start);
         if (!decl.empty()) {
           parseDeclarationIntoStyle(decl, style, propNameBuf, propValueBuf);
         }
@@ -344,7 +344,7 @@ CssStyle CssParser::parseDeclarations(const std::string& declBlock) {
 
 // Rule processing
 
-void CssParser::processRuleBlockWithStyle(const std::string& selectorGroup, const CssStyle& style) {
+void CssParser::processRuleBlockWithStyle(const std::string_view selectorGroup, const CssStyle& style) {
   // Check if we've reached the rule limit before processing
   if (rulesBySelector_.size() >= MAX_RULES) {
     LOG_DBG("CSS", "Reached max rules limit (%zu), stopping CSS parsing", MAX_RULES);
@@ -503,10 +503,10 @@ bool CssParser::loadFromStream(FsFile& source) {
       --bodyDepth;
       if (bodyDepth == 0) {
         if (!skippingRule && !declBuffer.empty()) {
-          parseDeclarationIntoStyle(declBuffer.str(), currentStyle, propNameBuf, propValueBuf);
+          parseDeclarationIntoStyle(declBuffer.view(), currentStyle, propNameBuf, propValueBuf);
         }
         if (!skippingRule) {
-          processRuleBlockWithStyle(selector.str(), currentStyle);
+          processRuleBlockWithStyle(selector.view(), currentStyle);
         }
         selector.clear();
         declBuffer.clear();
@@ -521,7 +521,7 @@ bool CssParser::loadFromStream(FsFile& source) {
     if (!skippingRule) {
       if (c == ';') {
         if (!declBuffer.empty()) {
-          parseDeclarationIntoStyle(declBuffer.str(), currentStyle, propNameBuf, propValueBuf);
+          parseDeclarationIntoStyle(declBuffer.view(), currentStyle, propNameBuf, propValueBuf);
           declBuffer.clear();
         }
       } else {
@@ -581,7 +581,7 @@ bool CssParser::loadFromStream(FsFile& source) {
 
 // Style resolution
 
-CssStyle CssParser::resolveStyle(const std::string& tagName, const std::string& classAttr) const {
+CssStyle CssParser::resolveStyle(const std::string_view tagName, const std::string_view classAttr) const {
   static bool lowHeapWarningLogged = false;
   if (ESP.getFreeHeap() < MIN_FREE_HEAP_FOR_CSS) {
     if (!lowHeapWarningLogged) {
@@ -631,7 +631,7 @@ CssStyle CssParser::resolveStyle(const std::string& tagName, const std::string& 
 
 // Inline style parsing (static - doesn't need rule database)
 
-CssStyle CssParser::parseInlineStyle(const std::string& styleValue) { return parseDeclarations(styleValue); }
+CssStyle CssParser::parseInlineStyle(const std::string_view styleValue) { return parseDeclarations(styleValue); }
 
 // Cache serialization
 
