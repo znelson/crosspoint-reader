@@ -1170,7 +1170,6 @@ void GfxRenderer::cleanupGrayscaleWithFrameBuffer() const {
   }
 }
 
-
 void GfxRenderer::getOrientedViewableTRBL(int* outTop, int* outRight, int* outBottom, int* outLeft) const {
   switch (orientation) {
     case Portrait:
