@@ -82,13 +82,12 @@ static uint8_t lookupKernClass(const EpdKernClassEntry* entries, const uint16_t 
   }
 
   const auto target = static_cast<uint16_t>(cp);
-  const auto* begin = entries;
   const auto* end = entries + count;
 
   // lower_bound: exact-key lookup. Finds the first entry with codepoint >= target,
   // then the equality check confirms an exact match exists.
   const auto it = std::lower_bound(
-      begin, end, target, [](const EpdKernClassEntry& entry, const uint16_t value) { return entry.codepoint < value; });
+      entries, end, target, [](const EpdKernClassEntry& entry, uint16_t value) { return entry.codepoint < value; });
 
   if (it != end && it->codepoint == target) {
     return it->classId;
@@ -116,13 +115,12 @@ uint32_t EpdFont::getLigature(const uint32_t leftCp, const uint32_t rightCp) con
   }
 
   const uint32_t key = (leftCp << 16) | rightCp;
-  const auto* begin = pairs;
   const auto* end = pairs + count;
 
   // lower_bound: exact-key lookup. Finds the first entry with pair >= key,
   // then the equality check confirms an exact match exists.
-  const auto it = std::lower_bound(begin, end, key,
-                                   [](const EpdLigaturePair& pair, const uint32_t value) { return pair.pair < value; });
+  const auto it =
+      std::lower_bound(pairs, end, key, [](const EpdLigaturePair& pair, uint32_t value) { return pair.pair < value; });
 
   if (it != end && it->pair == key) {
     return it->ligatureCp;
@@ -150,21 +148,19 @@ uint32_t EpdFont::applyLigatures(uint32_t cp, const char*& text) const {
 }
 
 const EpdGlyph* EpdFont::getGlyph(const uint32_t cp) const {
-  const EpdUnicodeInterval* intervals = data->intervals;
   const int count = data->intervalCount;
-
   if (count == 0) return nullptr;
 
-  const auto* begin = intervals;
+  const EpdUnicodeInterval* intervals = data->intervals;
   const auto* end = intervals + count;
 
   // upper_bound: range lookup. Finds the first interval with first > cp, so the
   // interval just before it is the last one with first <= cp. That's the only
   // candidate that could contain cp. Then we verify cp <= candidate.last.
   const auto it = std::upper_bound(
-      begin, end, cp, [](uint32_t value, const EpdUnicodeInterval& interval) { return value < interval.first; });
+      intervals, end, cp, [](uint32_t value, const EpdUnicodeInterval& interval) { return value < interval.first; });
 
-  if (it != begin) {
+  if (it != intervals) {
     const auto& interval = *(it - 1);
     if (cp <= interval.last) {
       return &data->glyph[interval.offset + (cp - interval.first)];
