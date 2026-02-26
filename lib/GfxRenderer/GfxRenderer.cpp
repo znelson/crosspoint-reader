@@ -232,7 +232,7 @@ void GfxRenderer::drawText(const int fontId, const int x, const int y, const cha
         }
       }
 
-      const int combiningX = lastBaseX + fp4::toPixel(lastBaseAdvanceFP) / 2;
+      const int combiningX = lastBaseX + fp4::toPixel(lastBaseAdvanceFP / 2);
       const int combiningY = yPos - raiseBy;
       renderCharImpl<TextRotation::None>(*this, renderMode, font, cp, combiningX, combiningY, black, style);
       continue;
@@ -1050,7 +1050,7 @@ void GfxRenderer::drawTextRotated90CW(const int fontId, const int x, const int y
       }
 
       const int combiningX = x - raiseBy;
-      const int combiningY = lastBaseY - fp4::toPixel(lastBaseAdvanceFP) / 2;
+      const int combiningY = lastBaseY - fp4::toPixel(lastBaseAdvanceFP / 2);
       renderCharImpl<TextRotation::Rotated90CW>(*this, renderMode, font, cp, combiningX, combiningY, black, style);
       continue;
     }
