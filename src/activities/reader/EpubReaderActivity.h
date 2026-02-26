@@ -1,5 +1,6 @@
 #pragma once
 #include <Epub.h>
+#include <Epub/FootnoteEntry.h>
 #include <Epub/Section.h>
 
 #include "EpubReaderMenuActivity.h"
@@ -25,15 +26,29 @@ class EpubReaderActivity final : public ActivityWithSubactivity {
   const std::function<void()> onGoBack;
   const std::function<void()> onGoHome;
 
+  // Footnote support
+  std::vector<FootnoteEntry> currentPageFootnotes;
+  struct SavedPosition {
+    int spineIndex;
+    int pageNumber;
+  };
+  static constexpr int MAX_FOOTNOTE_DEPTH = 3;
+  SavedPosition savedPositions[MAX_FOOTNOTE_DEPTH] = {};
+  int footnoteDepth = 0;
+
   void renderContents(std::unique_ptr<Page> page, int orientedMarginTop, int orientedMarginRight,
                       int orientedMarginBottom, int orientedMarginLeft);
-  void renderStatusBar(int orientedMarginRight, int orientedMarginBottom, int orientedMarginLeft) const;
+  void renderStatusBar() const;
   void saveProgress(int spineIndex, int currentPage, int pageCount);
   // Jump to a percentage of the book (0-100), mapping it to spine and page.
   void jumpToPercent(int percent);
   void onReaderMenuBack(uint8_t orientation);
   void onReaderMenuConfirm(EpubReaderMenuActivity::MenuAction action);
   void applyOrientation(uint8_t orientation);
+
+  // Footnote navigation
+  void navigateToHref(const char* href, bool savePosition = false);
+  void restoreSavedPosition();
 
  public:
   explicit EpubReaderActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, std::unique_ptr<Epub> epub,
