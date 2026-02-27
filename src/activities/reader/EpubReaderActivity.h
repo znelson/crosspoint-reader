@@ -62,8 +62,8 @@ class EpubReaderActivity final : public ActivityWithSubactivity {
   void onReaderMenuBack(uint8_t orientation);
   void onReaderMenuConfirm(EpubReaderMenuActivity::MenuAction action);
   void applyOrientation(uint8_t orientation);
-  // Build section caches for all spine items in the current TOC chapter and compute page info.
-  void ensureChapterCached(uint16_t viewportWidth, uint16_t viewportHeight);
+  // Prepare the current section (and all sibling spines in the TOC chapter if needed).
+  bool prepareSection(uint16_t viewportWidth, uint16_t viewportHeight);
   // Returns the chapter-relative page number for the current position.
   int getChapterRelativePage() const;
 
