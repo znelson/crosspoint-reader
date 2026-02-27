@@ -266,7 +266,7 @@ There are two tasks relevant to the activity system:
 
 Both tasks run at priority 1. Since the ESP32-C3 is single-core, they alternate execution: the main task runs `loop()`, then at the end of the loop iteration, notifies the render task if an update was requested. The render task wakes, acquires the mutex, calls `render()`, releases the mutex, and blocks again.
 
-Activities may also create their own background tasks (e.g., for network operations). These tasks can call `requestUpdate()` or `requestUpdateAndWait()` to trigger renders, but must never call `render()` directly.
+Avoid creating additional FreeRTOS tasks inside activities. Most work that seems to need a background task can be done directly in `loop()` using non-blocking patterns or `requestUpdateAndWait()`. There are currently only two activities that create their own tasks (for network operations), and these are considered technical debt — arbitrary `xTaskCreate` is error-prone because the task must be carefully tied to the activity's lifecycle and cleaned up in `onExit()`. If a background task is genuinely unavoidable, it should be wrapped in a lifecycle-aware `Worker` helper that ties creation and deletion to `onEnter()` / `onExit()`, rather than using raw `xTaskCreate` / `vTaskDelete`. Such a wrapper does not exist yet — if you find yourself needing one, that's the right time to build it. Background tasks must never call `render()` directly; use `requestUpdate()` or `requestUpdateAndWait()` instead.
 
 ### The Render Mutex and RenderLock
 
@@ -461,7 +461,7 @@ void MyActivity::doNetworkStuff() {
     RenderLock lock;
     state = LOADING;
   }
-  requestUpdate();               // render "Loading..." while we work
+  requestUpdate(true);           // render "Loading..." immediately, before we block
   auto result = http.get(url);   // lock is not held
   {
     RenderLock lock;
