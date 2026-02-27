@@ -3,6 +3,11 @@
 #include <Logging.h>
 #include <Utf8.h>
 
+#include <AutoBuffer.h>
+
+#include <algorithm>
+#include <vector>
+
 const uint8_t* GfxRenderer::getGlyphBitmap(const EpdFontData* fontData, const EpdGlyph* glyph) const {
   if (fontData->groups != nullptr) {
     if (!fontDecompressor) {
@@ -601,13 +606,11 @@ void GfxRenderer::drawBitmap(const Bitmap& bitmap, const int x, const int y, con
   // Calculate output row size (2 bits per pixel, packed into bytes)
   // IMPORTANT: Use int, not uint8_t, to avoid overflow for images > 1020 pixels wide
   const int outputRowSize = (bitmap.getWidth() + 3) / 4;
-  auto* outputRow = static_cast<uint8_t*>(malloc(outputRowSize));
-  auto* rowBytes = static_cast<uint8_t*>(malloc(bitmap.getRowBytes()));
+  auto outputRow = makeNoThrow<uint8_t[]>(outputRowSize);
+  auto rowBytes = makeNoThrow<uint8_t[]>(bitmap.getRowBytes());
 
   if (!outputRow || !rowBytes) {
     LOG_ERR("GFX", "!! Failed to allocate BMP row buffers");
-    free(outputRow);
-    free(rowBytes);
     return;
   }
 
@@ -623,10 +626,8 @@ void GfxRenderer::drawBitmap(const Bitmap& bitmap, const int x, const int y, con
       break;
     }
 
-    if (bitmap.readNextRow(outputRow, rowBytes) != BmpReaderError::Ok) {
+    if (bitmap.readNextRow(outputRow.get(), rowBytes.get()) != BmpReaderError::Ok) {
       LOG_ERR("GFX", "Failed to read row %d from bitmap", bmpY);
-      free(outputRow);
-      free(rowBytes);
       return;
     }
 
@@ -663,9 +664,6 @@ void GfxRenderer::drawBitmap(const Bitmap& bitmap, const int x, const int y, con
       }
     }
   }
-
-  free(outputRow);
-  free(rowBytes);
 }
 
 void GfxRenderer::drawBitmap1Bit(const Bitmap& bitmap, const int x, const int y, const int maxWidth,
@@ -683,22 +681,18 @@ void GfxRenderer::drawBitmap1Bit(const Bitmap& bitmap, const int x, const int y,
 
   // For 1-bit BMP, output is still 2-bit packed (for consistency with readNextRow)
   const int outputRowSize = (bitmap.getWidth() + 3) / 4;
-  auto* outputRow = static_cast<uint8_t*>(malloc(outputRowSize));
-  auto* rowBytes = static_cast<uint8_t*>(malloc(bitmap.getRowBytes()));
+  auto outputRow = makeNoThrow<uint8_t[]>(outputRowSize);
+  auto rowBytes = makeNoThrow<uint8_t[]>(bitmap.getRowBytes());
 
   if (!outputRow || !rowBytes) {
     LOG_ERR("GFX", "!! Failed to allocate 1-bit BMP row buffers");
-    free(outputRow);
-    free(rowBytes);
     return;
   }
 
   for (int bmpY = 0; bmpY < bitmap.getHeight(); bmpY++) {
     // Read rows sequentially using readNextRow
-    if (bitmap.readNextRow(outputRow, rowBytes) != BmpReaderError::Ok) {
+    if (bitmap.readNextRow(outputRow.get(), rowBytes.get()) != BmpReaderError::Ok) {
       LOG_ERR("GFX", "Failed to read row %d from 1-bit bitmap", bmpY);
-      free(outputRow);
-      free(rowBytes);
       return;
     }
 
@@ -732,9 +726,6 @@ void GfxRenderer::drawBitmap1Bit(const Bitmap& bitmap, const int x, const int y,
       // White pixels (val == 3) are not drawn (leave background)
     }
   }
-
-  free(outputRow);
-  free(rowBytes);
 }
 
 void GfxRenderer::fillPolygon(const int* xPoints, const int* yPoints, int numPoints, bool state) const {
@@ -752,7 +743,7 @@ void GfxRenderer::fillPolygon(const int* xPoints, const int* yPoints, int numPoi
   if (maxY >= getScreenHeight()) maxY = getScreenHeight() - 1;
 
   // Allocate node buffer for scanline algorithm
-  auto* nodeX = static_cast<int*>(malloc(numPoints * sizeof(int)));
+  auto nodeX = makeNoThrow<int[]>(numPoints);
   if (!nodeX) {
     LOG_ERR("GFX", "!! Failed to allocate polygon node buffer");
     return;
@@ -775,16 +766,7 @@ void GfxRenderer::fillPolygon(const int* xPoints, const int* yPoints, int numPoi
       j = i;
     }
 
-    // Sort nodes by X (simple bubble sort, numPoints is small)
-    for (int i = 0; i < nodes - 1; i++) {
-      for (int k = i + 1; k < nodes; k++) {
-        if (nodeX[i] > nodeX[k]) {
-          int temp = nodeX[i];
-          nodeX[i] = nodeX[k];
-          nodeX[k] = temp;
-        }
-      }
-    }
+    std::sort(nodeX.get(), nodeX.get() + nodes);
 
     // Fill between pairs of nodes
     for (int i = 0; i < nodes - 1; i += 2) {
@@ -801,8 +783,6 @@ void GfxRenderer::fillPolygon(const int* xPoints, const int* yPoints, int numPoi
       }
     }
   }
-
-  free(nodeX);
 }
 
 // For performance measurement (using static to allow "const" methods)

@@ -1,5 +1,6 @@
 #include "HomeActivity.h"
 
+#include <AutoBuffer.h>
 #include <Bitmap.h>
 #include <Epub.h>
 #include <GfxRenderer.h>
@@ -136,16 +137,13 @@ bool HomeActivity::storeCoverBuffer() {
     return false;
   }
 
-  // Free any existing buffer first
-  freeCoverBuffer();
-
   const size_t bufferSize = GfxRenderer::getBufferSize();
-  coverBuffer = static_cast<uint8_t*>(malloc(bufferSize));
+  coverBuffer = makeNoThrow<uint8_t[]>(bufferSize);
   if (!coverBuffer) {
     return false;
   }
-
-  memcpy(coverBuffer, frameBuffer, bufferSize);
+  memcpy(coverBuffer.get(), frameBuffer, bufferSize);
+  coverBufferSize = bufferSize;
   return true;
 }
 
@@ -159,16 +157,13 @@ bool HomeActivity::restoreCoverBuffer() {
     return false;
   }
 
-  const size_t bufferSize = GfxRenderer::getBufferSize();
-  memcpy(frameBuffer, coverBuffer, bufferSize);
+  memcpy(frameBuffer, coverBuffer.get(), coverBufferSize);
   return true;
 }
 
 void HomeActivity::freeCoverBuffer() {
-  if (coverBuffer) {
-    free(coverBuffer);
-    coverBuffer = nullptr;
-  }
+  coverBuffer.reset();
+  coverBufferSize = 0;
   coverBufferStored = false;
 }
 

@@ -7,6 +7,7 @@
 
 #include "XtcParser.h"
 
+#include <AutoBuffer.h>
 #include <FsHelpers.h>
 #include <HalStorage.h>
 #include <Logging.h>
@@ -422,18 +423,21 @@ XtcError XtcParser::loadPageStreaming(uint32_t pageIndex,
   }
 
   // Read in chunks
-  std::vector<uint8_t> chunk(chunkSize);
+  auto chunk = makeNoThrow<uint8_t[]>(chunkSize);
+  if (!chunk) {
+    return XtcError::READ_ERROR;
+  }
   size_t totalRead = 0;
 
   while (totalRead < bitmapSize) {
     size_t toRead = std::min(chunkSize, bitmapSize - totalRead);
-    size_t bytesRead = m_file.read(chunk.data(), toRead);
+    size_t bytesRead = m_file.read(chunk.get(), toRead);
 
     if (bytesRead == 0) {
       return XtcError::READ_ERROR;
     }
 
-    callback(chunk.data(), bytesRead, totalRead);
+    callback(chunk.get(), bytesRead, totalRead);
     totalRead += bytesRead;
   }
 

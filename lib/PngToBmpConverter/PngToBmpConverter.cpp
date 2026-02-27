@@ -4,8 +4,11 @@
 #include <InflateReader.h>
 #include <Logging.h>
 
+#include <AutoBuffer.h>
+
 #include <cstdio>
 #include <cstring>
+#include <memory>
 
 #include "BitmapHelpers.h"
 
@@ -611,55 +614,49 @@ bool PngToBmpConverter::pngFileToBmpStreamInternal(FsFile& pngFile, Print& bmpOu
     bytesPerRow = (outWidth * 2 + 31) / 32 * 4;
   }
 
-  // Allocate BMP row buffer
-  auto* rowBuffer = static_cast<uint8_t*>(malloc(bytesPerRow));
+  // BMP row buffer
+  auto rowBuffer = makeNoThrow<uint8_t[]>(bytesPerRow);
   if (!rowBuffer) {
-    LOG_ERR("PNG", "Failed to allocate row buffer");
-    free(ctx.currentRow);
-    free(ctx.previousRow);
+    LOG_ERR("PNG", "Failed to allocate BMP row buffer");
     return false;
   }
 
   // Create ditherers (same as JpegToBmpConverter)
-  AtkinsonDitherer* atkinsonDitherer = nullptr;
-  FloydSteinbergDitherer* fsDitherer = nullptr;
-  Atkinson1BitDitherer* atkinson1BitDitherer = nullptr;
+  std::unique_ptr<AtkinsonDitherer> atkinsonDitherer;
+  std::unique_ptr<FloydSteinbergDitherer> fsDitherer;
+  std::unique_ptr<Atkinson1BitDitherer> atkinson1BitDitherer;
 
   if (oneBit) {
-    atkinson1BitDitherer = new Atkinson1BitDitherer(outWidth);
+    atkinson1BitDitherer = std::make_unique<Atkinson1BitDitherer>(outWidth);
   } else if (!USE_8BIT_OUTPUT) {
     if (USE_ATKINSON) {
-      atkinsonDitherer = new AtkinsonDitherer(outWidth);
+      atkinsonDitherer = std::make_unique<AtkinsonDitherer>(outWidth);
     } else if (USE_FLOYD_STEINBERG) {
-      fsDitherer = new FloydSteinbergDitherer(outWidth);
+      fsDitherer = std::make_unique<FloydSteinbergDitherer>(outWidth);
     }
   }
 
   // Scaling accumulators
-  uint32_t* rowAccum = nullptr;
-  uint16_t* rowCount = nullptr;
+  std::unique_ptr<uint32_t[]> rowAccum;
+  std::unique_ptr<uint16_t[]> rowCount;
   int currentOutY = 0;
   uint32_t nextOutY_srcStart = 0;
 
   if (needsScaling) {
-    rowAccum = new uint32_t[outWidth]();
-    rowCount = new uint16_t[outWidth]();
+    rowAccum = makeNoThrow<uint32_t[]>(outWidth);
+    rowCount = makeNoThrow<uint16_t[]>(outWidth);
+    if (!rowAccum || !rowCount) {
+      LOG_ERR("PNG", "Failed to allocate scaling accumulators");
+      return false;
+    }
     nextOutY_srcStart = scaleY_fp;
   }
 
-  // Allocate grayscale row buffer - batch-convert each scanline to avoid
+  // Grayscale row buffer - batch-convert each scanline to avoid
   // per-pixel getPixelGray() switch overhead in the hot loops
-  auto* grayRow = static_cast<uint8_t*>(malloc(width));
+  auto grayRow = makeNoThrow<uint8_t[]>(width);
   if (!grayRow) {
     LOG_ERR("PNG", "Failed to allocate grayscale row buffer");
-    delete[] rowAccum;
-    delete[] rowCount;
-    delete atkinsonDitherer;
-    delete fsDitherer;
-    delete atkinson1BitDitherer;
-    free(rowBuffer);
-    free(ctx.currentRow);
-    free(ctx.previousRow);
     return false;
   }
 
@@ -675,11 +672,11 @@ bool PngToBmpConverter::pngFileToBmpStreamInternal(FsFile& pngFile, Print& bmpOu
     }
 
     // Batch-convert entire scanline to grayscale (one branch, tight loop)
-    convertScanlineToGray(ctx, grayRow);
+    convertScanlineToGray(ctx, grayRow.get());
 
     if (!needsScaling) {
       // Direct output (no scaling)
-      memset(rowBuffer, 0, bytesPerRow);
+      memset(rowBuffer.get(), 0, bytesPerRow);
 
       if (USE_8BIT_OUTPUT && !oneBit) {
         for (int x = 0; x < outWidth; x++) {
@@ -714,7 +711,7 @@ bool PngToBmpConverter::pngFileToBmpStreamInternal(FsFile& pngFile, Print& bmpOu
         else if (fsDitherer)
           fsDitherer->nextRow();
       }
-      bmpOut.write(rowBuffer, bytesPerRow);
+      bmpOut.write(rowBuffer.get(), bytesPerRow);
     } else {
       // Area-averaging scaling (same as JpegToBmpConverter)
       for (int outX = 0; outX < outWidth; outX++) {
@@ -743,7 +740,7 @@ bool PngToBmpConverter::pngFileToBmpStreamInternal(FsFile& pngFile, Print& bmpOu
       // Output all rows whose boundaries we've crossed (handles both up and downscaling)
       // For upscaling, one source row may produce multiple output rows
       while (srcY_fp >= nextOutY_srcStart && currentOutY < outHeight) {
-        memset(rowBuffer, 0, bytesPerRow);
+        memset(rowBuffer.get(), 0, bytesPerRow);
 
         if (USE_8BIT_OUTPUT && !oneBit) {
           for (int x = 0; x < outWidth; x++) {
@@ -781,7 +778,7 @@ bool PngToBmpConverter::pngFileToBmpStreamInternal(FsFile& pngFile, Print& bmpOu
             fsDitherer->nextRow();
         }
 
-        bmpOut.write(rowBuffer, bytesPerRow);
+        bmpOut.write(rowBuffer.get(), bytesPerRow);
         currentOutY++;
 
         nextOutY_srcStart = static_cast<uint32_t>(currentOutY + 1) * scaleY_fp;
@@ -793,8 +790,8 @@ bool PngToBmpConverter::pngFileToBmpStreamInternal(FsFile& pngFile, Print& bmpOu
           continue;
         }
         // Moving to next source row - reset accumulators
-        memset(rowAccum, 0, outWidth * sizeof(uint32_t));
-        memset(rowCount, 0, outWidth * sizeof(uint16_t));
+        memset(rowAccum.get(), 0, outWidth * sizeof(uint32_t));
+        memset(rowCount.get(), 0, outWidth * sizeof(uint16_t));
       }
     }
 
@@ -804,14 +801,7 @@ bool PngToBmpConverter::pngFileToBmpStreamInternal(FsFile& pngFile, Print& bmpOu
     ctx.currentRow = temp;
   }
 
-  // Clean up
-  free(grayRow);
-  delete[] rowAccum;
-  delete[] rowCount;
-  delete atkinsonDitherer;
-  delete fsDitherer;
-  delete atkinson1BitDitherer;
-  free(rowBuffer);
+  // Clean up context scanline buffers (managed by C malloc due to uzlib layout constraint)
   free(ctx.currentRow);
   free(ctx.previousRow);
 

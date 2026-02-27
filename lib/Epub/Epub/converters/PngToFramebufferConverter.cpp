@@ -5,7 +5,10 @@
 #include <Logging.h>
 #include <PNGdec.h>
 
+#include <AutoBuffer.h>
+
 #include <cstdlib>
+#include <memory>
 #include <new>
 
 #include "DitherUtils.h"
@@ -245,7 +248,7 @@ bool PngToFramebufferConverter::getDimensionsStatic(const std::string& imagePath
     return false;
   }
 
-  PNG* png = new (std::nothrow) PNG();
+  auto png = makeNoThrow<PNG>();
   if (!png) {
     LOG_ERR("PNG", "Failed to allocate PNG decoder for dimensions");
     return false;
@@ -256,7 +259,6 @@ bool PngToFramebufferConverter::getDimensionsStatic(const std::string& imagePath
 
   if (rc != 0) {
     LOG_ERR("PNG", "Failed to open PNG for dimensions: %d", rc);
-    delete png;
     return false;
   }
 
@@ -264,7 +266,6 @@ bool PngToFramebufferConverter::getDimensionsStatic(const std::string& imagePath
   out.height = png->getHeight();
 
   png->close();
-  delete png;
   return true;
 }
 
@@ -279,9 +280,9 @@ bool PngToFramebufferConverter::decodeToFramebuffer(const std::string& imagePath
   }
 
   // Heap-allocate PNG decoder (~42 KB) - freed at end of function
-  PNG* png = new (std::nothrow) PNG();
+  auto png = makeNoThrow<PNG>();
   if (!png) {
-    LOG_ERR("PNG", "Failed to allocate PNG decoder");
+    LOG_ERR("PNG", "Failed to allocate PNG decoder (~42KB)");
     return false;
   }
 
@@ -295,13 +296,11 @@ bool PngToFramebufferConverter::decodeToFramebuffer(const std::string& imagePath
                      pngDrawCallback);
   if (rc != PNG_SUCCESS) {
     LOG_ERR("PNG", "Failed to open PNG: %d", rc);
-    delete png;
     return false;
   }
 
   if (!validateImageDimensions(png->getWidth(), png->getHeight(), "PNG")) {
     png->close();
-    delete png;
     return false;
   }
 
@@ -337,7 +336,6 @@ bool PngToFramebufferConverter::decodeToFramebuffer(const std::string& imagePath
             requiredInternal, ctx.srcWidth, pixelType, PNG_MAX_BUFFERED_PIXELS);
     LOG_ERR("PNG", "Aborting decode to avoid PNGdec internal buffer overflow");
     png->close();
-    delete png;
     return false;
   }
 
@@ -345,15 +343,14 @@ bool PngToFramebufferConverter::decodeToFramebuffer(const std::string& imagePath
     warnUnsupportedFeature("bit depth (" + std::to_string(png->getBpp()) + "bpp)", imagePath);
   }
 
-  // Allocate grayscale line buffer on demand (~3.2 KB) - freed after decode
+  // Allocate grayscale line buffer on demand (~3.2 KB)
   const size_t grayBufSize = PNG_MAX_BUFFERED_PIXELS / 2;
-  ctx.grayLineBuffer = static_cast<uint8_t*>(malloc(grayBufSize));
-  if (!ctx.grayLineBuffer) {
-    LOG_ERR("PNG", "Failed to allocate gray line buffer");
-    png->close();
-    delete png;
+  auto grayLineBuf = makeNoThrow<uint8_t[]>(grayBufSize);
+  if (!grayLineBuf) {
+    LOG_ERR("PNG", "Failed to allocate grayscale line buffer");
     return false;
   }
+  ctx.grayLineBuffer = grayLineBuf.get();
 
   // Allocate cache buffer using SCALED dimensions
   ctx.caching = !config.cachePath.empty();
@@ -368,18 +365,13 @@ bool PngToFramebufferConverter::decodeToFramebuffer(const std::string& imagePath
   rc = png->decode(&ctx, 0);
   unsigned long decodeTime = millis() - decodeStart;
 
-  free(ctx.grayLineBuffer);
-  ctx.grayLineBuffer = nullptr;
-
   if (rc != PNG_SUCCESS) {
     LOG_ERR("PNG", "Decode failed: %d", rc);
     png->close();
-    delete png;
     return false;
   }
 
   png->close();
-  delete png;
   LOG_DBG("PNG", "PNG decoding complete - render time: %lu ms", decodeTime);
 
   // Write cache file if caching was enabled and buffer was allocated

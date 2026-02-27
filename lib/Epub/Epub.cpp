@@ -12,6 +12,8 @@
 #include "Epub/parsers/TocNavParser.h"
 #include "Epub/parsers/TocNcxParser.h"
 
+#include <vector>
+
 bool Epub::findContentOpfFile(std::string* contentOpfFile) const {
   const auto containerPath = "META-INF/container.xml";
   size_t containerSize;
@@ -172,27 +174,19 @@ bool Epub::parseTocNcxFile() const {
     return false;
   }
 
-  const auto ncxBuffer = static_cast<uint8_t*>(malloc(1024));
-  if (!ncxBuffer) {
-    LOG_ERR("EBP", "Could not allocate memory for toc ncx parser");
-    tempNcxFile.close();
-    return false;
-  }
+  std::vector<uint8_t> ncxBuffer(1024);
 
   while (tempNcxFile.available()) {
-    const auto readSize = tempNcxFile.read(ncxBuffer, 1024);
+    const auto readSize = tempNcxFile.read(ncxBuffer.data(), 1024);
     if (readSize == 0) break;
-    const auto processedSize = ncxParser.write(ncxBuffer, readSize);
+    const auto processedSize = ncxParser.write(ncxBuffer.data(), readSize);
 
     if (processedSize != readSize) {
       LOG_ERR("EBP", "Could not process all toc ncx data");
-      free(ncxBuffer);
       tempNcxFile.close();
       return false;
     }
   }
-
-  free(ncxBuffer);
   tempNcxFile.close();
   Storage.remove(tmpNcxPath.c_str());
 
@@ -231,25 +225,18 @@ bool Epub::parseTocNavFile() const {
     return false;
   }
 
-  const auto navBuffer = static_cast<uint8_t*>(malloc(1024));
-  if (!navBuffer) {
-    LOG_ERR("EBP", "Could not allocate memory for toc nav parser");
-    return false;
-  }
+  std::vector<uint8_t> navBuffer(1024);
 
   while (tempNavFile.available()) {
-    const auto readSize = tempNavFile.read(navBuffer, 1024);
-    const auto processedSize = navParser.write(navBuffer, readSize);
+    const auto readSize = tempNavFile.read(navBuffer.data(), 1024);
+    const auto processedSize = navParser.write(navBuffer.data(), readSize);
 
     if (processedSize != readSize) {
       LOG_ERR("EBP", "Could not process all toc nav data");
-      free(navBuffer);
       tempNavFile.close();
       return false;
     }
   }
-
-  free(navBuffer);
   tempNavFile.close();
   Storage.remove(tmpNavPath.c_str());
 
