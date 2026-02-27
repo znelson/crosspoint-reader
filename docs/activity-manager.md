@@ -20,7 +20,7 @@ This document explains the refactoring from the original per-activity render tas
 
 Each activity created its own FreeRTOS render task on entry and destroyed it on exit:
 
-```
+```text
 ┌─────────────────────────────────────────────────────────┐
 │ Main Task (Arduino loop)                                │
 │  ┌───────────────────────────────────────────────────┐  │
@@ -52,7 +52,7 @@ Problems with this approach:
 
 A single `ActivityManager` owns the render task and manages an activity stack:
 
-```
+```text
 ┌──────────────────────────────────────────────────────────┐
 │ Main Task (Arduino loop)                                 │
 │                                                          │
@@ -248,7 +248,7 @@ The firmware runs on an ESP32-C3, a single-core RISC-V microcontroller. FreeRTOS
 
 There are two tasks relevant to the activity system:
 
-```
+```text
 ┌──────────────────────┐     ┌──────────────────────────┐
 │ Main Task            │     │ Render Task              │
 │ (Arduino loop)       │     │ (ActivityManager-owned)   │
@@ -310,7 +310,7 @@ void MyActivity::render(RenderLock&&) {
 
 **Critical rule**: Never call `requestUpdateAndWait()` while holding a `RenderLock`. The render task needs the mutex to call `render()`, so holding it while waiting for the render to complete is a deadlock:
 
-```
+```text
 Main Task                    Render Task
 ──────────                   ───────────
 RenderLock lock;             (blocked on mutex)
@@ -326,7 +326,7 @@ requestUpdateAndWait();
 
 ### requestUpdate() vs requestUpdateAndWait()
 
-```
+```text
 requestUpdate(false)          requestUpdate(true)
 ─────────────────             ─────────────────
 Sets flag only.               Notifies render task
@@ -349,7 +349,7 @@ caller's task handle.
 
 `requestUpdateAndWait()` flow in detail:
 
-```
+```text
 Calling Task                 Render Task
 ────────────                 ───────────
 requestUpdateAndWait()
@@ -374,7 +374,7 @@ requestUpdateAndWait()
 
 ### Activity Lifecycle Under ActivityManager
 
-```
+```text
 activityManager.replaceActivity(make_unique<MyActivity>(...))
   │
   ▼
@@ -403,7 +403,7 @@ activityManager.replaceActivity(make_unique<MyActivity>(...))
 
 For push/pop (subactivity) navigation:
 
-```
+```text
 Parent calls: startActivityForResult(make_unique<Child>(...), handler)
   │
   ▼
