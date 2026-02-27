@@ -7,7 +7,7 @@ class EpdFont {
  public:
   const EpdFontData* data;
   explicit EpdFont(const EpdFontData* data) : data(data) {}
-  ~EpdFont() = default;
+
   void getTextDimensions(const char* string, int* w, int* h) const;
 
   const EpdGlyph* getGlyph(uint32_t cp) const;

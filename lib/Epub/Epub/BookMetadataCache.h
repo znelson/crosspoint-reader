@@ -86,7 +86,6 @@ class BookMetadataCache {
 
   explicit BookMetadataCache(std::string cachePath)
       : cachePath(std::move(cachePath)), lutOffset(0), spineCount(0), tocCount(0), loaded(false), buildMode(false) {}
-  ~BookMetadataCache() = default;
 
   // Building phase (stream to disk immediately)
   bool beginWrite();

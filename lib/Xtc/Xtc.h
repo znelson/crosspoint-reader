@@ -31,7 +31,6 @@ class Xtc {
     // Create cache key based on filepath (same as Epub)
     cachePath = cacheDir + "/xtc_" + std::to_string(std::hash<std::string>{}(this->filepath));
   }
-  ~Xtc() = default;
 
   /**
    * Load XTC file

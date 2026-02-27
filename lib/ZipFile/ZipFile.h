@@ -53,7 +53,7 @@ class ZipFile {
 
  public:
   explicit ZipFile(const std::string& filePath) : filePath(filePath) {}
-  ~ZipFile() = default;
+
   // Zip file can be opened and closed by hand in order to allow for quick calculation of inflated file size
   // It is NOT recommended to pre-open it for any kind of inflation due to memory constraints
   bool isOpen() const { return !!file; }

@@ -24,7 +24,7 @@ class TextBlock final : public Block {
         wordXpos(std::move(word_xpos)),
         wordStyles(std::move(word_styles)),
         blockStyle(blockStyle) {}
-  ~TextBlock() override = default;
+
   void setBlockStyle(const BlockStyle& blockStyle) { this->blockStyle = blockStyle; }
   const BlockStyle& getBlockStyle() const { return blockStyle; }
   const std::vector<std::string>& getWords() const { return words; }

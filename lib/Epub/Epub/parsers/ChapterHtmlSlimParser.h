@@ -114,7 +114,6 @@ class ChapterHtmlSlimParser {
         contentBase(contentBase),
         imageBasePath(imageBasePath) {}
 
-  ~ChapterHtmlSlimParser() = default;
   bool parseAndBuildPages();
   void addLineToPage(std::shared_ptr<TextBlock> line);
 };

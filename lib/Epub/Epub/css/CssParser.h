@@ -34,11 +34,12 @@ class CssParser {
   static constexpr uint8_t CSS_CACHE_VERSION = 3;
 
   explicit CssParser(std::string cachePath) : cachePath(std::move(cachePath)) {}
-  ~CssParser() = default;
 
-  // Non-copyable
   CssParser(const CssParser&) = delete;
   CssParser& operator=(const CssParser&) = delete;
+
+  CssParser(CssParser&&) = default;
+  CssParser& operator=(CssParser&&) = default;
 
   /**
    * Load and parse CSS from a file stream.

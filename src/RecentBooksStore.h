@@ -25,8 +25,6 @@ class RecentBooksStore {
   friend bool JsonSettingsIO::loadRecentBooks(RecentBooksStore&, const char*);
 
  public:
-  ~RecentBooksStore() = default;
-
   // Get singleton instance
   static RecentBooksStore& getInstance() { return instance; }
 
