@@ -891,7 +891,7 @@ bool EpubReaderActivity::prepareSection(const uint16_t viewportWidth, const uint
       int i = firstSpine;
       const auto popupFn = [this, &i, firstSpine, totalSpines]() {
         char buf[48];
-        snprintf(buf, sizeof(buf), tr(STR_INDEXING_PROGRESS), i - firstSpine + 1, totalSpines);
+        snprintf(buf, sizeof(buf), "%s (%d/%d)", tr(STR_INDEXING), i - firstSpine + 1, totalSpines);
         GUI.drawPopup(renderer, buf);
       };
 
