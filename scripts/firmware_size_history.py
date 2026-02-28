@@ -15,18 +15,20 @@ Two modes (mutually exclusive, one required):
 
 Common options:
   --env ENV            PlatformIO build environment (default: "default")
-  --csv FILE           Write CSV output to FILE instead of stdout.
+  --csv [FILE]         Output as CSV.  Without FILE, writes to stdout.
+
+Output is a human-readable table by default.  Use --csv for machine-readable
+output.
 
 Examples:
     python3 scripts/firmware_size_history.py --range HEAD~5 HEAD
     python3 scripts/firmware_size_history.py --range abc1234 def5678 --env gh_release --csv sizes.csv
     python3 scripts/firmware_size_history.py --commits main feature/new-parser
-    python3 scripts/firmware_size_history.py --commits abc1234 def5678 ghi9012 --csv sizes.csv
+    python3 scripts/firmware_size_history.py --commits abc1234 def5678 ghi9012 --csv
 """
 
 import argparse
 import csv
-import io
 import re
 import subprocess
 import sys
@@ -98,6 +100,54 @@ def parse_flash_used(output):
     return None
 
 
+def write_csv(out, rows, fieldnames):
+    """Write rows as CSV to a file-like object."""
+    writer = csv.DictWriter(out, fieldnames=fieldnames)
+    writer.writeheader()
+    writer.writerows(rows)
+
+
+def format_table(rows):
+    """Print rows as an aligned human-readable table to stdout."""
+    COL_COMMIT = 10
+    COL_FLASH = 11
+    COL_DELTA = 7
+
+    def fmt_flash(val):
+        if val == "FAILED":
+            return "FAILED"
+        return f"{val:,}"
+
+    def fmt_delta(val):
+        if val == "" or val is None:
+            return ""
+        return f"{val:+,}"
+
+    header = (
+        f"{'Commit':<{COL_COMMIT}}  "
+        f"{'Flash':>{COL_FLASH}}  "
+        f"{'Delta':>{COL_DELTA}}  "
+        f"Title"
+    )
+    sep = (
+        f"{'\u2500' * COL_COMMIT}  "
+        f"{'\u2500' * COL_FLASH}  "
+        f"{'\u2500' * COL_DELTA}  "
+        f"{'\u2500' * 40}"
+    )
+    print(header)
+    print(sep)
+    for row in rows:
+        flash_str = fmt_flash(row["flash_bytes"])
+        delta_str = fmt_delta(row["delta"])
+        print(
+            f"{row['commit']:<{COL_COMMIT}}  "
+            f"{flash_str:>{COL_FLASH}}  "
+            f"{delta_str:>{COL_DELTA}}  "
+            f"{row['title']}"
+        )
+
+
 def build_commits_from_range(start, end):
     """Validate a range and return (all_commits, description) for the build loop."""
     start_sha, start_title = resolve_ref(start)
@@ -140,7 +190,10 @@ def main():
     )
 
     parser.add_argument("--env", default="default", help="PlatformIO environment (default: 'default')")
-    parser.add_argument("--csv", dest="csv_file", default=None, help="Output CSV file (default: stdout)")
+    parser.add_argument(
+        "--csv", nargs="?", const="-", default=None, metavar="FILE",
+        help="Output as CSV (default: stdout, or specify FILE)",
+    )
     args = parser.parse_args()
 
     # Validate refs before touching the working tree so a bad ref never
@@ -202,7 +255,7 @@ def main():
             print("[info] Restoring stashed changes...", file=sys.stderr)
             run(["git", "stash", "pop"], check=False)
 
-    # Build CSV rows with deltas
+    # Build result rows with deltas
     rows = []
     prev_size = None
     for sha, title, used in results:
@@ -221,18 +274,16 @@ def main():
 
     fieldnames = ["commit", "title", "flash_bytes", "delta"]
 
-    if args.csv_file:
-        with open(args.csv_file, "w", newline="") as f:
-            writer = csv.DictWriter(f, fieldnames=fieldnames)
-            writer.writeheader()
-            writer.writerows(rows)
-        print(f"\n[done] Wrote {args.csv_file}", file=sys.stderr)
+    if args.csv is not None:
+        if args.csv == "-":
+            write_csv(sys.stdout, rows, fieldnames)
+        else:
+            with open(args.csv, "w", newline="") as f:
+                write_csv(f, rows, fieldnames)
+            print(f"\n[done] Wrote {args.csv}", file=sys.stderr)
     else:
-        buf = io.StringIO()
-        writer = csv.DictWriter(buf, fieldnames=fieldnames)
-        writer.writeheader()
-        writer.writerows(rows)
-        print(f"\n{buf.getvalue()}", end="")
+        print()
+        format_table(rows)
 
 
 if __name__ == "__main__":
