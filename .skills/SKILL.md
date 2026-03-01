@@ -408,7 +408,7 @@ void onExit()   { /* free: vTaskDelete, free buffer, close files */ Activity::on
 - Bookerly: 12, 14, 16, 18pt (4 styles each: regular, bold, italic, bold-italic)
 - Noto Sans: 12, 14, 16, 18pt (4 styles each)
 - OpenDyslexic: 8, 10, 12, 14pt (4 styles each)
-- IBM Plex Sans UI fonts: 10, 12pt (2 styles)
+- Inter UI fonts: 10, 12pt (2 styles)
 
 **Total**: ~80+ global `EpdFont` and `EpdFontFamily` objects
 

@@ -49,7 +49,7 @@
 #include <builtinFonts/opendyslexic_8_bolditalic.h>
 #include <builtinFonts/opendyslexic_8_italic.h>
 #include <builtinFonts/opendyslexic_8_regular.h>
-#include <builtinFonts/ibmplexsans_10_bold.h>
-#include <builtinFonts/ibmplexsans_10_regular.h>
-#include <builtinFonts/ibmplexsans_12_bold.h>
-#include <builtinFonts/ibmplexsans_12_regular.h>
+#include <builtinFonts/inter_10_bold.h>
+#include <builtinFonts/inter_10_regular.h>
+#include <builtinFonts/inter_12_bold.h>
+#include <builtinFonts/inter_12_regular.h>
