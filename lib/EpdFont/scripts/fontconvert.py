@@ -54,7 +54,6 @@ for face in font_stack:
 
 is2Bit = args.is2Bit
 size = args.size
-size = args.size
 font_name = args.name
 load_flags = freetype.FT_LOAD_RENDER
 if args.force_autohint:
