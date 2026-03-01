@@ -41,12 +41,15 @@ done
 
 UI_FONT_SIZES=(10 12)
 UI_FONT_STYLES=("Regular" "Bold")
+UI_FONT_THAI_INTERVAL="0x0E00,0x0E7F"
 
 for size in ${UI_FONT_SIZES[@]}; do
   for style in ${UI_FONT_STYLES[@]}; do
     font_name="ibmplexsans_${size}_$(echo $style | tr '[:upper:]' '[:lower:]')"
-    font_path="../builtinFonts/source/IBMPlexSans/IBMPlexSans-${style}.ttf"
-    python fontconvert.py $font_name $size $font_path > "../builtinFonts/${font_name}.h"
+    font_primary="../builtinFonts/source/IBMPlexSans/IBMPlexSans-${style}.ttf"
+    font_thai="../builtinFonts/source/IBMPlexSans/IBMPlexSansThaiLooped-${style}.ttf"
+    python fontconvert.py $font_name $size "$font_primary" "$font_thai" \
+      --additional-intervals "$UI_FONT_THAI_INTERVAL" > "../builtinFonts/${font_name}.h"
     echo "Generated ../builtinFonts/${font_name}.h"
   done
 done
