@@ -36,6 +36,7 @@ import sys
 FLASH_RE = re.compile(
     r"Flash:.*?(\d+)\s+bytes\s+from\s+(\d+)\s+bytes"
 )
+BOX_CHAR = "\u2500"
 
 
 def run(cmd, capture=True, check=True):
@@ -130,10 +131,10 @@ def format_table(rows):
         f"Title"
     )
     sep = (
-        f"{'\u2500' * COL_COMMIT}  "
-        f"{'\u2500' * COL_FLASH}  "
-        f"{'\u2500' * COL_DELTA}  "
-        f"{'\u2500' * 40}"
+        f"{BOX_CHAR * COL_COMMIT}  "
+        f"{BOX_CHAR * COL_FLASH}  "
+        f"{BOX_CHAR * COL_DELTA}  "
+        f"{BOX_CHAR * 40}"
     )
     print(header)
     print(sep)
