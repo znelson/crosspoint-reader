@@ -40,16 +40,15 @@ for size in ${OPENDYSLEXIC_FONT_SIZES[@]}; do
 done
 
 UI_FONT_SIZES=(10 12)
-UI_FONT_PATH="../builtinFonts/source/Inter/Inter-VariableFont_opsz,wght.ttf"
+UI_FONT_STYLES=("Regular" "Bold")
 
 for size in ${UI_FONT_SIZES[@]}; do
-  font_name="inter_${size}_regular"
-  python fontconvert.py $font_name $size "$UI_FONT_PATH" --weight 400 > "../builtinFonts/${font_name}.h"
-  echo "Generated ../builtinFonts/${font_name}.h"
-
-  font_name="inter_${size}_bold"
-  python fontconvert.py $font_name $size "$UI_FONT_PATH" --weight 700 > "../builtinFonts/${font_name}.h"
-  echo "Generated ../builtinFonts/${font_name}.h"
+  for style in ${UI_FONT_STYLES[@]}; do
+    font_name="ibmplexsans_${size}_$(echo $style | tr '[:upper:]' '[:lower:]')"
+    font_path="../builtinFonts/source/IBMPlexSans/IBMPlexSans-${style}.ttf"
+    python fontconvert.py $font_name $size $font_path > "../builtinFonts/${font_name}.h"
+    echo "Generated ../builtinFonts/${font_name}.h"
+  done
 done
 
 python fontconvert.py notosans_8_regular 8 ../builtinFonts/source/NotoSans/NotoSans-Regular.ttf > ../builtinFonts/notosans_8_regular.h

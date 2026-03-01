@@ -18,40 +18,11 @@ parser.add_argument("--2bit", dest="is2Bit", action="store_true", help="generate
 parser.add_argument("--additional-intervals", dest="additional_intervals", action="append", help="Additional code point intervals to export as min,max. This argument can be repeated.")
 parser.add_argument("--compress", dest="compress", action="store_true", help="Compress glyph bitmaps using DEFLATE with group-based compression.")
 parser.add_argument("--force-autohint", dest="force_autohint", action="store_true", help="Force FreeType auto-hinter instead of native font hinting. Improves stem width consistency for fonts with weak or no native TrueType hints.")
-parser.add_argument("--weight", type=int, default=None, help="Weight for variable fonts (e.g. 400=Regular, 700=Bold).")
-parser.add_argument("--opsz", type=int, default=None, help="Optical size for variable fonts (defaults to size if omitted).")
 args = parser.parse_args()
 
 GlyphProps = namedtuple("GlyphProps", ["width", "height", "advance_x", "left", "top", "data_length", "data_offset", "code_point"])
 
 font_stack = [freetype.Face(f) for f in args.fontstack]
-
-# --- Variable font axis handling ---
-# Variable fonts (e.g. Inter) encode multiple styles (Regular, Bold) in a single file
-# via design axes. FreeType's set_var_design_coords() selects the instance before
-# rasterization. The coords array order MUST match the font's fvar axis order.
-#
-# HARDCODED FOR INTER: Inter-VariableFont_opsz,wght.ttf has axes [opsz, wght].
-#   - opsz: optical size (pt), typically 12-24 for text; we use size or --opsz.
-#   - wght: weight, 100-900 (400=Regular, 700=Bold).
-#
-# FOR FUTURE FONTS: If adding another variable font with different axes:
-#   1. Check axis order: python -c "import freetype; f=freetype.Face('font.ttf'); print(f.get_variation_info())"
-#   2. Common axes: wght, wdth, opsz, ital, slnt. Order varies by font.
-#   3. Update var_coords construction to match that font's axis order.
-#   4. Consider adding font-specific --axis-name value args, or a generic
-#      --var-coords "opsz=12,wght=400" parser, then map to indices via get_variation_info().
-#
-var_coords = None
-if args.weight is not None:
-    opsz_val = args.opsz if args.opsz is not None else args.size
-    var_coords = [opsz_val, args.weight]  # Inter axis order: [opsz, wght]
-
-for face in font_stack:
-    if var_coords is not None and hasattr(face, 'set_var_design_coords') and face.has_multiple_masters:
-        face.set_var_design_coords(var_coords)
-    face.set_char_size(args.size << 6, args.size << 6, 150, 150)
-
 is2Bit = args.is2Bit
 size = args.size
 font_name = args.name
@@ -200,6 +171,9 @@ for i_start, i_end in unvalidated_intervals:
             start = code_point + 1
     if start != i_end + 1:
         intervals.append((start, i_end))
+
+for face in font_stack:
+    face.set_char_size(size << 6, size << 6, 150, 150)
 
 total_size = 0
 all_glyphs = []
