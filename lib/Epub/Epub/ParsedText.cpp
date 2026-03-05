@@ -90,30 +90,37 @@ void ParsedText::addWord(std::string word, const EpdFontFamily::Style fontStyle,
   const WordJoin firstJoin = attachToPrevious ? WordJoin::ATTACHED : WordJoin::SPACED;
 
   if (ThaiShaper::containsThai(word.c_str())) {
-    const char* text = word.c_str();
-    const size_t len = word.size();
-    size_t offset = 0;
-    bool first = true;
-    while (offset < len) {
-      size_t next = ThaiShaper::nextClusterBoundary(text, offset);
-      if (next <= offset) {
-        next = offset + 1;
-        while (next < len && (static_cast<uint8_t>(text[next]) & 0xC0) == 0x80) {
-          next++;
-        }
-      }
-      words.push_back(word.substr(offset, next - offset));
-      wordStyles.push_back(combinedStyle);
-      wordJoins.push_back(first ? firstJoin : WordJoin::JOINED);
-      first = false;
-      offset = next;
-    }
+    addSegmentedWord(word, combinedStyle, firstJoin, ThaiShaper::nextClusterBoundary);
     return;
   }
 
   words.push_back(std::move(word));
   wordStyles.push_back(combinedStyle);
   wordJoins.push_back(firstJoin);
+}
+
+void ParsedText::addSegmentedWord(const std::string& word, const EpdFontFamily::Style style, const WordJoin firstJoin,
+                                  const ClusterBoundaryFn nextBoundary) {
+  const char* text = word.c_str();
+  const size_t len = word.size();
+  size_t offset = 0;
+  bool first = true;
+
+  while (offset < len) {
+    size_t next = nextBoundary(text, offset);
+    if (next <= offset) {
+      // Safety: advance to next valid UTF-8 leading byte
+      next = offset + 1;
+      while (next < len && (static_cast<uint8_t>(text[next]) & 0xC0) == 0x80) {
+        next++;
+      }
+    }
+    words.push_back(word.substr(offset, next - offset));
+    wordStyles.push_back(style);
+    wordJoins.push_back(first ? firstJoin : WordJoin::JOINED);
+    first = false;
+    offset = next;
+  }
 }
 
 // Consumes data to minimize memory usage
