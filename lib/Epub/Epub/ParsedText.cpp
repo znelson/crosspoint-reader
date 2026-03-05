@@ -89,6 +89,13 @@ void ParsedText::addWord(std::string word, const EpdFontFamily::Style fontStyle,
 
   const WordJoin firstJoin = attachToPrevious ? WordJoin::ATTACHED : WordJoin::SPACED;
 
+  // Scripts without inter-word spaces need segmentation into breakable clusters
+  // before entering the layout engine. To add a new script:
+  //   1. Write a containsXxx(const char*) detector and a
+  //      nextClusterBoundary(const char*, size_t) function matching ClusterBoundaryFn.
+  //   2. Add a detection block here following the Thai pattern below.
+  // Candidates: Lao (U+0E80–0EFF), Khmer (U+1780–17FF), Myanmar (U+1000–109F),
+  //             Tibetan (U+0F00–0FFF), CJK (per-character breaks).
   if (ThaiShaper::containsThai(word.c_str())) {
     addSegmentedWord(word, combinedStyle, firstJoin, ThaiShaper::nextClusterBoundary);
     return;
