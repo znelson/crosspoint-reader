@@ -2811,6 +2811,7 @@ static const EpdKernClassEntry opendyslexic_10_boldKernLeftClasses[] = {
     { 0x0103, 2 }, // U+0103
     { 0x0104, 2 }, // U+0104
     { 0x0105, 2 }, // U+0105
+    { 0x010A, 2 }, // U+010A
     { 0x010B, 2 }, // U+010B
     { 0x010F, 2 }, // U+010F
     { 0x0111, 2 }, // U+0111
@@ -3086,19 +3087,19 @@ static const EpdKernClassEntry opendyslexic_10_boldKernRightClasses[] = {
     { 0x0020, 1 }, // U+0020
     { 0x0300, 2 }, // U+0300
     { 0x0301, 3 }, // U+0301
-    { 0x030A, 2 }, // U+030A
+    { 0x030A, 4 }, // U+030A
     { 0x0312, 3 }, // U+0312
     { 0x0313, 3 }, // U+0313
-    { 0x0314, 3 }, // U+0314
+    { 0x0314, 4 }, // U+0314
     { 0x0326, 2 }, // U+0326
-    { 0x0327, 4 }, // U+0327
+    { 0x0327, 5 }, // U+0327
     { 0x0328, 3 }, // U+0328
-    { 0x033D, 2 }, // U+033D
+    { 0x033D, 4 }, // U+033D
 };
 
 static const int8_t opendyslexic_10_boldKernMatrix[] = {
-      53,   16,   32,   96,
-       0,    0,    0,    0,
+      53,   16,   32,   32,   96,
+       0,    0,    0,    0,    0,
 };
 
 static const EpdFontData opendyslexic_10_bold = {
@@ -3115,10 +3116,10 @@ static const EpdFontData opendyslexic_10_bold = {
     opendyslexic_10_boldKernLeftClasses,
     opendyslexic_10_boldKernRightClasses,
     opendyslexic_10_boldKernMatrix,
-    362,
+    363,
     11,
     2,
-    4,
+    5,
     nullptr,
     0,
 };

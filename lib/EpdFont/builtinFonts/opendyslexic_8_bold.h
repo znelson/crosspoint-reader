@@ -2370,6 +2370,7 @@ static const EpdKernClassEntry opendyslexic_8_boldKernLeftClasses[] = {
     { 0x00AA, 2 }, // U+00AA
     { 0x00AB, 1 }, // U+00AB
     { 0x00AD, 1 }, // U+00AD
+    { 0x00AE, 2 }, // U+00AE
     { 0x00B5, 2 }, // U+00B5
     { 0x00B7, 1 }, // U+00B7
     { 0x00B9, 2 }, // U+00B9
@@ -2435,6 +2436,7 @@ static const EpdKernClassEntry opendyslexic_8_boldKernLeftClasses[] = {
     { 0x0111, 2 }, // U+0111
     { 0x0116, 2 }, // U+0116
     { 0x0117, 2 }, // U+0117
+    { 0x0120, 2 }, // U+0120
     { 0x0121, 2 }, // U+0121
     { 0x0124, 2 }, // U+0124
     { 0x0126, 2 }, // U+0126
@@ -2525,6 +2527,8 @@ static const EpdKernClassEntry opendyslexic_8_boldKernLeftClasses[] = {
     { 0x01EB, 2 }, // U+01EB
     { 0x01EC, 2 }, // U+01EC
     { 0x01ED, 2 }, // U+01ED
+    { 0x01EE, 2 }, // U+01EE
+    { 0x01EF, 2 }, // U+01EF
     { 0x01F9, 2 }, // U+01F9
     { 0x01FA, 2 }, // U+01FA
     { 0x01FB, 2 }, // U+01FB
@@ -2604,6 +2608,8 @@ static const EpdKernClassEntry opendyslexic_8_boldKernLeftClasses[] = {
     { 0x04D9, 2 }, // U+04D9
     { 0x04DB, 2 }, // U+04DB
     { 0x04DF, 2 }, // U+04DF
+    { 0x04E0, 2 }, // U+04E0
+    { 0x04E1, 2 }, // U+04E1
     { 0x04E6, 2 }, // U+04E6
     { 0x04E7, 2 }, // U+04E7
     { 0x04E8, 2 }, // U+04E8
@@ -2766,6 +2772,7 @@ static const EpdKernClassEntry opendyslexic_8_boldKernRightClasses[] = {
     { 0x0312, 4 }, // U+0312
     { 0x0313, 4 }, // U+0313
     { 0x0314, 4 }, // U+0314
+    { 0x031A, 3 }, // U+031A
     { 0x0326, 2 }, // U+0326
     { 0x0327, 5 }, // U+0327
     { 0x0328, 4 }, // U+0328
@@ -2797,8 +2804,8 @@ static const EpdFontData opendyslexic_8_bold = {
     opendyslexic_8_boldKernLeftClasses,
     opendyslexic_8_boldKernRightClasses,
     opendyslexic_8_boldKernMatrix,
-    426,
-    24,
+    432,
+    25,
     2,
     5,
     nullptr,
