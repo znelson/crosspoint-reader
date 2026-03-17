@@ -58,6 +58,7 @@ find src -name "*.cpp" -o -name "*.h" | xargs clang-format -i
 6. `constexpr` First: Compile-time constants and lookup tables must be `constexpr`, not just `static const`. This moves computation to compile time, enables dead-branch elimination, and guarantees flash placement. Use `static constexpr` for class-level constants.
 7. `std::vector` Pre-allocation: Always call `.reserve(N)` before any `push_back()` loop. Each growth event allocates a new block (2×), copies all elements, then frees the old one — three heap operations that fragment DRAM. When the final size is unknown, estimate conservatively.
 8. SPIFFS Write Throttling: Never write a settings file on every user interaction. Guard all writes with a value-change check (`if (newVal == _current) return;`). Progress saves during reading must be debounced — write on activity exit or every N page turns, not on every turn. SPIFFS sectors have a finite erase cycle limit.
+9. `new` is not nothrow on ESP32: With `-fno-exceptions`, bare `new` that fails calls `abort()` — it does NOT return `nullptr`. Always use `new (std::nothrow)` and null-check the result, or use `makeUniqueNoThrow<T>()` from `lib/Memory/Memory.h`. Never write bare `new` for any fallible allocation.
 
 ---
 
@@ -294,6 +295,58 @@ buffer = nullptr;
 - Text chunk buffers: [TxtReaderActivity.cpp:259](../src/activities/reader/TxtReaderActivity.cpp)
 - Bitmap rendering: [GfxRenderer.cpp:439-440](../lib/GfxRenderer/GfxRenderer.cpp)
 - OTA update buffer: [OtaUpdater.cpp:40](../src/network/OtaUpdater.cpp)
+
+### Heap Allocation with `new`: Always Use `std::nothrow`
+
+**CRITICAL**: With `-fno-exceptions`, bare `new` on OOM calls `abort()` — it does NOT return `nullptr`. Always use `new (std::nothrow)` and null-check, or prefer `makeUniqueNoThrow` from `lib/Memory/Memory.h`. `malloc` is already nothrow by definition (returns `nullptr` on failure) and remains acceptable per the pattern above.
+
+**Pattern — RAII single object (preferred)**:
+```cpp
+#include <Memory.h>
+
+auto obj = makeUniqueNoThrow<MyClass>(args);
+if (!obj) { LOG_ERR("MOD", "OOM: MyClass"); return false; }
+
+auto buf = makeUniqueNoThrow<uint8_t[]>(size);
+if (!buf) { LOG_ERR("MOD", "OOM: %d bytes", size); return false; }
+```
+
+**Pattern — raw pointer with `new (std::nothrow)`**:
+```cpp
+auto* obj = new (std::nothrow) MyClass(args);
+if (!obj) { LOG_ERR("MOD", "OOM: MyClass"); return false; }
+```
+
+**Pattern — multiple raw allocations with early returns (use `ScopedCleanup`)**:
+When a function holds several raw resources (`malloc` + `new`) across multiple return paths, declare a `ScopedCleanup` immediately after initialising all pointers to `nullptr`. It runs on every exit — success and failure alike:
+```cpp
+#include <Memory.h>
+
+uint8_t* buf = nullptr;
+MyClass* obj = nullptr;
+const ScopedCleanup cleanup{[&]{
+  free(buf);
+  delete obj;
+}};
+
+buf = static_cast<uint8_t*>(malloc(size));
+if (!buf) { LOG_ERR("MOD", "OOM"); return false; }
+
+obj = new (std::nothrow) MyClass(args);
+if (!obj) { LOG_ERR("MOD", "OOM: MyClass"); return false; }
+
+return doWork(buf, obj);  // cleanup runs automatically
+```
+
+**Rules**:
+- **NEVER use bare `new`** — always `new (std::nothrow)` or `makeUniqueNoThrow`
+- **ALWAYS `LOG_ERR` before returning false** on OOM (same as malloc pattern)
+- **Prefer `makeUniqueNoThrow`** for single-owner objects — no manual `delete` needed
+- **Use `ScopedCleanup`** when a function mixes `malloc` + `new` and has multiple return paths
+
+**Examples in codebase**:
+- JPEG converter: [JpegToBmpConverter.cpp](../lib/JpegToBmpConverter/JpegToBmpConverter.cpp) (`ScopedCleanup` + `new (std::nothrow)`)
+- Memory utilities: [Memory.h](../lib/Memory/Memory.h) (`makeUniqueNoThrow`, `ScopedCleanup`)
 
 ---
 
