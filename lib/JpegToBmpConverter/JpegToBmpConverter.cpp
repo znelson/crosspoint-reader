@@ -289,7 +289,7 @@ bool JpegToBmpConverter::jpegFileToBmpStreamInternal(FsFile& jpegFile, Print& bm
 
   // RAII guard: frees all heap resources on any return path, including early exits.
   // Holds references so it always sees the latest pointer values assigned below.
-  const ScopedCleanup cleanup{[&](){
+  const ScopedCleanup cleanup{[&]() {
     delete[] rowAccum;
     delete[] rowCount;
     delete atkinsonDitherer;
