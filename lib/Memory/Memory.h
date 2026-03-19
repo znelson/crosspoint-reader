@@ -6,25 +6,6 @@
 #include <type_traits>
 #include <utility>
 
-// Helper struct to call a cleanup function on exit from any scope.
-// Use with a lambda to avoid unnecessary allocations from std::function/std::bind:
-// Example:
-//   ScopedCleanup cleanup{[&]{ free(buf); }};
-//
-template <typename F>
-struct [[nodiscard]] ScopedCleanup final {
-  const F fn;
-  explicit ScopedCleanup(F f) : fn{std::move(f)} {}
-  ScopedCleanup(const ScopedCleanup&) = delete;
-  ScopedCleanup& operator=(const ScopedCleanup&) = delete;
-  ScopedCleanup(ScopedCleanup&&) = delete;
-  ScopedCleanup& operator=(ScopedCleanup&&) = delete;
-  ~ScopedCleanup() { fn(); }
-};
-
-template <typename F>
-ScopedCleanup(F) -> ScopedCleanup<F>;
-
 // Nothrow versions of std::make_unique. Return nullptr on allocation failure
 // instead of calling abort() (the default when exceptions are disabled on ESP32).
 //
