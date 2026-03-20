@@ -113,9 +113,12 @@ bool Section::loadSectionFile(const int fontId, const float lineCompression, con
   }
 
   serialization::readPod(file, pageCount);
+
+  // Build TOC boundaries by scanning anchor data from the still-open file,
+  // matching only the TOC anchors we need (avoids loading all anchors into memory).
+  buildTocBoundariesFromFile(file);
   file.close();
   LOG_DBG("SCT", "Deserialization succeeded: %d pages", pageCount);
-  buildTocBoundaries(readAnchorMap(filePath));
   return true;
 }
 
@@ -275,7 +278,7 @@ bool Section::createSectionFile(const int fontId, const float lineCompression, c
     cssParser->clear();
   }
 
-  buildTocBoundaries({anchors.begin(), anchors.end()});
+  buildTocBoundaries(anchors);
   return true;
 }
 
@@ -297,51 +300,119 @@ std::unique_ptr<Page> Section::loadPageFromSectionFile() {
   return page;
 }
 
-std::map<std::string, uint16_t> Section::readAnchorMap(const std::string& sectionPath) {
-  FsFile f;
-  if (!Storage.openFileForRead("SCT", sectionPath, f)) {
-    return {};
-  }
-
-  f.seek(HEADER_SIZE - sizeof(uint32_t));
-  uint32_t anchorMapOffset;
-  serialization::readPod(f, anchorMapOffset);
-  if (anchorMapOffset == 0) {
-    f.close();
-    return {};
-  }
-
-  f.seek(anchorMapOffset);
-  uint16_t count;
-  serialization::readPod(f, count);
-  std::map<std::string, uint16_t> result;
-  for (uint16_t i = 0; i < count; i++) {
-    std::string key;
-    uint16_t page;
-    serialization::readString(f, key);
-    serialization::readPod(f, page);
-    result.emplace(std::move(key), page);
-  }
-
-  f.close();
-  return result;
-}
-
-void Section::buildTocBoundaries(const std::map<std::string, uint16_t>& anchorMap) {
+// Resolve TOC anchor-to-page mappings from the parser's in-memory anchor vector.
+// Called after createSectionFile when anchors are already in memory.
+// See buildTocBoundariesFromFile for the on-disk variant; the two are kept separate
+// because the anchor resolution has fundamentally different iteration patterns
+// (scan in-memory vector vs. stream from file with early exit).
+void Section::buildTocBoundaries(const std::vector<std::pair<std::string, uint16_t>>& anchors) {
   const int startTocIndex = epub->getTocIndexForSpineIndex(spineIndex);
   if (startTocIndex < 0) return;
 
+  // Count TOC entries for this spine and how many have anchors to resolve
   const int tocCount = epub->getTocItemsCount();
+  uint16_t totalEntries = 0;
+  uint16_t unresolvedCount = 0;
   for (int i = startTocIndex; i < tocCount; i++) {
     const auto entry = epub->getTocItem(i);
     if (entry.spineIndex != spineIndex) break;
+    totalEntries++;
+    if (!entry.anchor.empty()) unresolvedCount++;
+  }
+
+  // If no TOC entries have anchors, all chapters start at page 0 and
+  // getTocIndexForPage falls back to epub->getTocIndexForSpineIndex,
+  // so there's nothing to resolve and no value in storing boundaries.
+  if (totalEntries == 0 || unresolvedCount == 0) return;
+
+  tocBoundaries.reserve(totalEntries);
+  for (int i = startTocIndex; i < startTocIndex + totalEntries; i++) {
+    const auto entry = epub->getTocItem(i);
     uint16_t page = 0;
     if (!entry.anchor.empty()) {
-      auto it = anchorMap.find(entry.anchor);
-      if (it != anchorMap.end()) page = it->second;
+      for (const auto& [key, val] : anchors) {
+        if (key == entry.anchor) {
+          page = val;
+          break;
+        }
+      }
     }
     tocBoundaries.push_back({i, page});
   }
+
+  // Defensive sort in case TOC entries are out of document order in a malformed epub
+  std::sort(tocBoundaries.begin(), tocBoundaries.end(),
+            [](const TocBoundary& a, const TocBoundary& b) { return a.startPage < b.startPage; });
+}
+
+// Resolve TOC anchor-to-page mappings by scanning the section cache's on-disk anchor data.
+// Called from loadSectionFile when anchors are not in memory. Caches the small set of
+// TOC anchor strings first (since getTocItem does file I/O to BookMetadataCache), then
+// streams through on-disk anchors matching only those, stopping as soon as all are found.
+// See buildTocBoundaries for the in-memory variant.
+void Section::buildTocBoundariesFromFile(FsFile& f) {
+  const int startTocIndex = epub->getTocIndexForSpineIndex(spineIndex);
+  if (startTocIndex < 0) return;
+
+  // Count TOC entries for this spine, then reserve and populate
+  const int tocCount = epub->getTocItemsCount();
+  uint16_t totalEntries = 0;
+  uint16_t unresolvedCount = 0;
+  for (int i = startTocIndex; i < tocCount; i++) {
+    const auto entry = epub->getTocItem(i);
+    if (entry.spineIndex != spineIndex) break;
+    totalEntries++;
+    if (!entry.anchor.empty()) unresolvedCount++;
+  }
+
+  // If no TOC entries have anchors, all chapters start at page 0 and
+  // getTocIndexForPage falls back to epub->getTocIndexForSpineIndex,
+  // so there's nothing to resolve and no value in storing boundaries.
+  if (totalEntries == 0 || unresolvedCount == 0) return;
+
+  // Cache TOC anchor strings before scanning disk, since getTocItem() does file I/O
+  struct TocAnchorEntry {
+    int tocIndex;
+    std::string anchor;
+  };
+  std::vector<TocAnchorEntry> tocAnchorsToResolve;
+  tocAnchorsToResolve.reserve(unresolvedCount);
+  tocBoundaries.reserve(totalEntries);
+  for (int i = startTocIndex; i < startTocIndex + totalEntries; i++) {
+    const auto entry = epub->getTocItem(i);
+    tocBoundaries.push_back({i, 0});
+    if (!entry.anchor.empty()) {
+      tocAnchorsToResolve.push_back({i, std::move(entry.anchor)});
+    }
+  }
+
+  // Single pass through on-disk anchors, matching against cached TOC anchors.
+  // Stop early once all TOC anchors are resolved.
+  f.seek(HEADER_SIZE - sizeof(uint32_t));
+  uint32_t anchorMapOffset;
+  serialization::readPod(f, anchorMapOffset);
+
+  if (anchorMapOffset != 0) {
+    f.seek(anchorMapOffset);
+    uint16_t count;
+    serialization::readPod(f, count);
+    std::string key;
+    for (uint16_t i = 0; i < count && unresolvedCount > 0; i++) {
+      uint16_t page;
+      serialization::readString(f, key);
+      serialization::readPod(f, page);
+      for (auto& tocAnchor : tocAnchorsToResolve) {
+        if (!tocAnchor.anchor.empty() && key == tocAnchor.anchor) {
+          tocBoundaries[tocAnchor.tocIndex - startTocIndex].startPage = page;
+          tocAnchor.anchor.clear();  // mark resolved
+          unresolvedCount--;
+          break;
+        }
+      }
+    }
+  }
+
+  // Defensive sort in case TOC entries are out of document order in a malformed epub
   std::sort(tocBoundaries.begin(), tocBoundaries.end(),
             [](const TocBoundary& a, const TocBoundary& b) { return a.startPage < b.startPage; });
 }

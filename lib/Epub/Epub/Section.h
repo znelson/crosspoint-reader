@@ -1,6 +1,5 @@
 #pragma once
 #include <functional>
-#include <map>
 #include <memory>
 #include <optional>
 #include <string>
@@ -29,8 +28,8 @@ class Section {
   };
   std::vector<TocBoundary> tocBoundaries;
 
-  static std::map<std::string, uint16_t> readAnchorMap(const std::string& sectionPath);
-  void buildTocBoundaries(const std::map<std::string, uint16_t>& anchorMap);
+  void buildTocBoundaries(const std::vector<std::pair<std::string, uint16_t>>& anchors);
+  void buildTocBoundariesFromFile(FsFile& f);
 
  public:
   uint16_t pageCount = 0;
