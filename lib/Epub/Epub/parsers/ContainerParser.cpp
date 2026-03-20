@@ -29,6 +29,7 @@ size_t ContainerParser::write(const uint8_t* buffer, const size_t size) {
     void* const buf = XML_GetBuffer(parser, 1024);
     if (!buf) {
       LOG_DBG("CTR", "Couldn't allocate buffer");
+      destroyXmlParser(parser);
       return 0;
     }
 
@@ -37,6 +38,7 @@ size_t ContainerParser::write(const uint8_t* buffer, const size_t size) {
 
     if (XML_ParseBuffer(parser, static_cast<int>(toRead), remainingSize == toRead) == XML_STATUS_ERROR) {
       LOG_ERR("CTR", "Parse error: %s", XML_ErrorString(XML_GetErrorCode(parser)));
+      destroyXmlParser(parser);
       return 0;
     }
 
