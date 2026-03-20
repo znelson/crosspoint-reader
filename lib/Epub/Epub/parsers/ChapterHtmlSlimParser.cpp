@@ -988,6 +988,7 @@ bool ChapterHtmlSlimParser::parseAndBuildPages() {
     if (!buf) {
       LOG_ERR("EHP", "Couldn't allocate memory for buffer");
       destroyXmlParser(parser);
+      file.close();
       return false;
     }
 
@@ -996,6 +997,7 @@ bool ChapterHtmlSlimParser::parseAndBuildPages() {
     if (len == 0 && file.available() > 0) {
       LOG_ERR("EHP", "File read error");
       destroyXmlParser(parser);
+      file.close();
       return false;
     }
 
@@ -1005,12 +1007,14 @@ bool ChapterHtmlSlimParser::parseAndBuildPages() {
       LOG_ERR("EHP", "Parse error at line %lu:\n%s", XML_GetCurrentLineNumber(parser),
               XML_ErrorString(XML_GetErrorCode(parser)));
       destroyXmlParser(parser);
+      file.close();
       return false;
     }
   } while (!done);
   LOG_DBG("EHP", "Time to parse and build pages: %lu ms", millis() - chapterStartTime);
 
   destroyXmlParser(parser);
+  file.close();
 
   // Process last page if there is still text
   if (currentTextBlock) {
