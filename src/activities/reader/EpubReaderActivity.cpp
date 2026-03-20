@@ -959,56 +959,34 @@ bool EpubReaderActivity::prepareSection(const uint16_t viewportWidth, const uint
       };
 
       for (; loopIndex <= lastSpine; loopIndex++) {
-        std::optional<uint16_t> spinePageCount;
-        Section* sectionForRange = nullptr;
+        // For every spine, we need a loaded Section to get accurate page ranges
+        // via getPageRangeForTocIndex (which requires tocBoundaries).
+        // The current spine loads into `section`; siblings use a stack-allocated temporary.
+        std::optional<Section> tmp;
+        Section* sec;
 
         if (loopIndex == currentSpineIndex) {
-          // Current spine: load directly into `section` so it's ready for rendering
-          if (section->loadSectionFile(fontId, lineCompression, extraParagraphSpacing, paragraphAlignment,
-                                       viewportWidth, viewportHeight, hyphenationEnabled, embeddedStyle,
-                                       imageRendering)) {
-            spinePageCount = section->pageCount;
-            sectionForRange = section.get();
-          }
+          sec = section.get();
         } else {
-          spinePageCount = Section::readCachedPageCount(
-              epub->getCachePath(), loopIndex, fontId, lineCompression, extraParagraphSpacing, paragraphAlignment,
-              viewportWidth, viewportHeight, hyphenationEnabled, embeddedStyle, imageRendering);
+          tmp.emplace(epub, loopIndex, renderer);
+          sec = &*tmp;
         }
 
-        // Build if no cache exists
-        if (!spinePageCount) {
-          std::optional<Section> tmp;
-          if (loopIndex != currentSpineIndex) {
-            tmp.emplace(epub, loopIndex, renderer);
-          }
-          Section& target = tmp ? *tmp : *section;
-
-          if (target.createSectionFile(fontId, lineCompression, extraParagraphSpacing, paragraphAlignment,
-                                       viewportWidth, viewportHeight, hyphenationEnabled, embeddedStyle, imageRendering,
-                                       popupFn)) {
-            spinePageCount = target.pageCount;
-            if (loopIndex == currentSpineIndex) sectionForRange = section.get();
-          } else {
+        if (!sec->loadSectionFile(fontId, lineCompression, extraParagraphSpacing, paragraphAlignment, viewportWidth,
+                                  viewportHeight, hyphenationEnabled, embeddedStyle, imageRendering)) {
+          if (!sec->createSectionFile(fontId, lineCompression, extraParagraphSpacing, paragraphAlignment, viewportWidth,
+                                      viewportHeight, hyphenationEnabled, embeddedStyle, imageRendering, popupFn)) {
             LOG_ERR("ERS", "Failed to build section cache for spine %d", loopIndex);
             continue;
           }
         }
 
         // Collect page range for this spine's contribution to the chapter
-        if (sectionForRange) {
-          auto range = sectionForRange->getPageRangeForTocIndex(tocIndex);
-          if (!range) range = Section::TocPageRange{0, *spinePageCount};
-          const int segPages = range->endPage - range->startPage;
-          chapterPageInfo.segments.push_back({loopIndex, range->startPage, segPages, chapterPageInfo.totalPages});
-          chapterPageInfo.totalPages += segPages;
-        } else {
-          // Sibling spine loaded via readCachedPageCount. No tocBoundaries available,
-          // so assume the full spine belongs to this chapter.
-          chapterPageInfo.segments.push_back(
-              {loopIndex, 0, static_cast<int>(*spinePageCount), chapterPageInfo.totalPages});
-          chapterPageInfo.totalPages += *spinePageCount;
-        }
+        auto range = sec->getPageRangeForTocIndex(tocIndex);
+        if (!range) range = Section::TocPageRange{0, sec->pageCount};
+        const int segPages = range->endPage - range->startPage;
+        chapterPageInfo.segments.push_back({loopIndex, range->startPage, segPages, chapterPageInfo.totalPages});
+        chapterPageInfo.totalPages += segPages;
       }
 
       LOG_DBG("ERS", "Chapter %d: %d spines (%d-%d), %d total pages", tocIndex, totalSpines, firstSpine, lastSpine,
