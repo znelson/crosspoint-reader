@@ -165,14 +165,12 @@ bool Epub::parseTocNcxFile() const {
 
   if (!ncxParser.setup()) {
     LOG_ERR("EBP", "Could not setup toc ncx parser");
-    tempNcxFile.close();
     return false;
   }
 
   const auto ncxBuffer = static_cast<uint8_t*>(malloc(1024));
   if (!ncxBuffer) {
     LOG_ERR("EBP", "Could not allocate memory for toc ncx parser");
-    tempNcxFile.close();
     return false;
   }
 
@@ -184,7 +182,6 @@ bool Epub::parseTocNcxFile() const {
     if (processedSize != readSize) {
       LOG_ERR("EBP", "Could not process all toc ncx data");
       free(ncxBuffer);
-      tempNcxFile.close();
       return false;
     }
   }
@@ -241,7 +238,6 @@ bool Epub::parseTocNavFile() const {
     if (processedSize != readSize) {
       LOG_ERR("EBP", "Could not process all toc nav data");
       free(navBuffer);
-      tempNavFile.close();
       return false;
     }
   }
@@ -555,7 +551,6 @@ bool Epub::generateCoverBmp(bool cropped) const {
 
     FsFile coverBmp;
     if (!Storage.openFileForWrite("EBP", getCoverBmpPath(cropped), coverBmp)) {
-      coverJpg.close();
       return false;
     }
     const bool success = JpegToBmpConverter::jpegFileToBmpStream(coverJpg, coverBmp, cropped);
@@ -588,7 +583,6 @@ bool Epub::generateCoverBmp(bool cropped) const {
 
     FsFile coverBmp;
     if (!Storage.openFileForWrite("EBP", getCoverBmpPath(cropped), coverBmp)) {
-      coverPng.close();
       return false;
     }
     const bool success = PngToBmpConverter::pngFileToBmpStream(coverPng, coverBmp, cropped);
@@ -642,7 +636,6 @@ bool Epub::generateThumbBmp(int height) const {
 
     FsFile thumbBmp;
     if (!Storage.openFileForWrite("EBP", getThumbBmpPath(height), thumbBmp)) {
-      coverJpg.close();
       return false;
     }
     // Use smaller target size for Continue Reading card (half of screen: 240x400)
@@ -678,7 +671,6 @@ bool Epub::generateThumbBmp(int height) const {
 
     FsFile thumbBmp;
     if (!Storage.openFileForWrite("EBP", getThumbBmpPath(height), thumbBmp)) {
-      coverPng.close();
       return false;
     }
     int THUMB_TARGET_WIDTH = height * 0.6;
@@ -702,7 +694,6 @@ bool Epub::generateThumbBmp(int height) const {
   // Write an empty bmp file to avoid generation attempts in the future
   FsFile thumbBmp;
   Storage.openFileForWrite("EBP", getThumbBmpPath(height), thumbBmp);
-  thumbBmp.close();
   return false;
 }
 
