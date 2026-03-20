@@ -36,6 +36,11 @@ class Epub {
   bool parseTocNavFile() const;
   void parseCssFiles() const;
 
+  // Extract a cover image from the EPUB zip to a temp file and open it for reading.
+  // On success, tempPath is set and imageFile is open for reading. Caller must remove tempPath when done.
+  bool extractCoverImage(const std::string& imageHref, const std::string& tempExt, std::string& tempPath,
+                         FsFile& imageFile) const;
+
  public:
   explicit Epub(std::string filepath, const std::string& cacheDir) : filepath(std::move(filepath)) {
     // create a cache key based on the filepath
