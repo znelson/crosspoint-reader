@@ -208,7 +208,12 @@ void EpubReaderActivity::loop() {
         const int curTocIndex = section->getTocIndexForPage(section->currentPage);
         const int nextTocIndex = nextTriggered ? curTocIndex + 1 : curTocIndex - 1;
 
-        if (nextTocIndex >= 0 && nextTocIndex < epub->getTocItemsCount()) {
+        if (curTocIndex < 0) {
+          // No TOC entry for this spine, fall back to spine-level skip
+          nextPageNumber = 0;
+          currentSpineIndex = nextTriggered ? currentSpineIndex + 1 : currentSpineIndex - 1;
+          section.reset();
+        } else if (nextTocIndex >= 0 && nextTocIndex < epub->getTocItemsCount()) {
           const int newSpineIndex = epub->getSpineIndexForTocIndex(nextTocIndex);
 
           if (newSpineIndex == currentSpineIndex) {
