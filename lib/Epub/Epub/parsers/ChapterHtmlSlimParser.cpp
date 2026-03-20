@@ -139,6 +139,7 @@ void ChapterHtmlSlimParser::startNewTextBlock(const BlockStyle& blockStyle) {
         anchorData.push_back({std::move(pendingAnchorId), static_cast<uint16_t>(completedPageCount)});
         pendingAnchorId.clear();
       }
+      wordsExtractedInBlock = 0;
       return;
     }
 
