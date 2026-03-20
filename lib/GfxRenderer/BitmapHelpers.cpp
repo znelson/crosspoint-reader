@@ -108,7 +108,7 @@ uint8_t quantize1bit(int gray, int x, int y) {
   return (gray >= adjustedThreshold) ? 1 : 0;
 }
 
-void createBmpHeader(BmpHeader* bmpHeader, int width, int height) {
+void createBmpHeader(BmpHeader* bmpHeader, int width, int height, BmpRowOrder rowOrder) {
   if (!bmpHeader) return;
 
   // Zero out the memory to ensure no garbage data if called on uninitialized stack memory
@@ -126,7 +126,7 @@ void createBmpHeader(BmpHeader* bmpHeader, int width, int height) {
 
   bmpHeader->infoHeader.biSize = sizeof(bmpHeader->infoHeader);
   bmpHeader->infoHeader.biWidth = width;
-  bmpHeader->infoHeader.biHeight = height;
+  bmpHeader->infoHeader.biHeight = (rowOrder == BmpRowOrder::TopDown) ? -height : height;
   bmpHeader->infoHeader.biPlanes = 1;
   bmpHeader->infoHeader.biBitCount = 1;
   bmpHeader->infoHeader.biCompression = 0;
