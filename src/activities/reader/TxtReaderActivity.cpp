@@ -401,7 +401,6 @@ void TxtReaderActivity::saveProgress() const {
     data[2] = 0;
     data[3] = 0;
     f.write(data, 4);
-    f.close();
   }
 }
 
@@ -419,7 +418,6 @@ void TxtReaderActivity::loadProgress() {
       }
       LOG_DBG("TRS", "Loaded progress: page %d/%d", currentPage, totalPages);
     }
-    f.close();
   }
 }
 
@@ -448,7 +446,6 @@ bool TxtReaderActivity::loadPageIndexCache() {
   serialization::readPod(f, magic);
   if (magic != CACHE_MAGIC) {
     LOG_DBG("TRS", "Cache magic mismatch, rebuilding");
-    f.close();
     return false;
   }
 
@@ -456,7 +453,6 @@ bool TxtReaderActivity::loadPageIndexCache() {
   serialization::readPod(f, version);
   if (version != CACHE_VERSION) {
     LOG_DBG("TRS", "Cache version mismatch (%d != %d), rebuilding", version, CACHE_VERSION);
-    f.close();
     return false;
   }
 
@@ -464,7 +460,6 @@ bool TxtReaderActivity::loadPageIndexCache() {
   serialization::readPod(f, fileSize);
   if (fileSize != txt->getFileSize()) {
     LOG_DBG("TRS", "Cache file size mismatch, rebuilding");
-    f.close();
     return false;
   }
 
@@ -472,7 +467,6 @@ bool TxtReaderActivity::loadPageIndexCache() {
   serialization::readPod(f, cachedWidth);
   if (cachedWidth != viewportWidth) {
     LOG_DBG("TRS", "Cache viewport width mismatch, rebuilding");
-    f.close();
     return false;
   }
 
@@ -480,7 +474,6 @@ bool TxtReaderActivity::loadPageIndexCache() {
   serialization::readPod(f, cachedLines);
   if (cachedLines != linesPerPage) {
     LOG_DBG("TRS", "Cache lines per page mismatch, rebuilding");
-    f.close();
     return false;
   }
 
@@ -488,7 +481,6 @@ bool TxtReaderActivity::loadPageIndexCache() {
   serialization::readPod(f, fontId);
   if (fontId != cachedFontId) {
     LOG_DBG("TRS", "Cache font ID mismatch (%d != %d), rebuilding", fontId, cachedFontId);
-    f.close();
     return false;
   }
 
@@ -496,7 +488,6 @@ bool TxtReaderActivity::loadPageIndexCache() {
   serialization::readPod(f, margin);
   if (margin != cachedScreenMargin) {
     LOG_DBG("TRS", "Cache screen margin mismatch, rebuilding");
-    f.close();
     return false;
   }
 
@@ -504,7 +495,6 @@ bool TxtReaderActivity::loadPageIndexCache() {
   serialization::readPod(f, alignment);
   if (alignment != cachedParagraphAlignment) {
     LOG_DBG("TRS", "Cache paragraph alignment mismatch, rebuilding");
-    f.close();
     return false;
   }
 
@@ -521,7 +511,6 @@ bool TxtReaderActivity::loadPageIndexCache() {
     pageOffsets.push_back(offset);
   }
 
-  f.close();
   totalPages = pageOffsets.size();
   LOG_DBG("TRS", "Loaded page index cache: %d pages", totalPages);
   return true;
@@ -551,6 +540,5 @@ void TxtReaderActivity::savePageIndexCache() const {
     serialization::writePod(f, static_cast<uint32_t>(offset));
   }
 
-  f.close();
   LOG_DBG("TRS", "Saved page index cache: %d pages", totalPages);
 }

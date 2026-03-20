@@ -378,7 +378,6 @@ void BaseTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect, const std:
           bookWidth = rect.width / 2;  // Fallback
         }
       }
-      file.close();
     }
   }
 
@@ -432,7 +431,6 @@ void BaseTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect, const std:
             renderer.drawRect(bookX + 2, bookY + 2, bookWidth - 4, bookHeight - 4);
           }
         }
-        file.close();
       }
     }
 

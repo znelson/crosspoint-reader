@@ -170,11 +170,9 @@ bool RecentBooksStore::loadFromBinaryFile() {
     }
   } else {
     LOG_ERR("RBS", "Deserialization failed: Unknown version %u", version);
-    inputFile.close();
     return false;
   }
 
-  inputFile.close();
   LOG_DBG("RBS", "Recent books loaded from binary file (%d entries)", static_cast<int>(recentBooks.size()));
   return true;
 }

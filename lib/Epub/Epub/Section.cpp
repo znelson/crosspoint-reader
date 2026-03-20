@@ -290,7 +290,6 @@ std::optional<uint16_t> Section::getPageForAnchor(const std::string& anchor) con
   uint32_t anchorMapOffset;
   serialization::readPod(f, anchorMapOffset);
   if (anchorMapOffset == 0 || anchorMapOffset >= fileSize) {
-    f.close();
     return std::nullopt;
   }
 
@@ -303,11 +302,9 @@ std::optional<uint16_t> Section::getPageForAnchor(const std::string& anchor) con
     serialization::readString(f, key);
     serialization::readPod(f, page);
     if (key == anchor) {
-      f.close();
       return page;
     }
   }
 
-  f.close();
   return std::nullopt;
 }
