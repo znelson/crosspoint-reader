@@ -163,6 +163,7 @@ bool RecentBooksStore::loadFromBinaryFile() {
     }
 
     if (omitted > 0) {
+      // Explicitly close() file before saveToFile() rewrites the same file
       inputFile.close();
       saveToFile();
       LOG_DBG("RBS", "Omitted %u recent book(s) with missing title", omitted);

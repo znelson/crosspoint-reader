@@ -295,6 +295,7 @@ bool ZipFile::open() {
 
 bool ZipFile::close() {
   if (file) {
+    // Explicit close() required: member variable persists beyond function scope
     file.close();
   }
   lastCentralDirPos = 0;
