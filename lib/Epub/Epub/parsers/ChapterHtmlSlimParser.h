@@ -63,6 +63,21 @@ class ChapterHtmlSlimParser {
   };
   std::vector<StyleStackEntry> inlineStyleStack;
   CssStyle currentCssStyle;
+
+  // Fixed-capacity block style stack - avoids heap allocation and fragmentation from
+  // per-chapter vector growth. Block nesting is structurally bounded (body > div > blockquote >
+  // div > p), unlike inline styles (span, b, i, u, a) which nest unpredictably per-book.
+  static constexpr int MAX_BLOCK_STYLE_DEPTH = 8;
+  struct BlockStyleStackEntry {
+    int depth = 0;
+    BlockStyle accumulated;  // all ancestors combined up to and including this entry
+  };
+  BlockStyleStackEntry blockStyleStack[MAX_BLOCK_STYLE_DEPTH] = {};
+  int blockStyleStackSize = 0;
+
+  BlockStyle getAccumulatedBlockStyle() const;
+  void pushBlockStyle(int depth, const BlockStyle& style);
+  void popBlockStyle(int depth);
   bool effectiveBold = false;
   bool effectiveItalic = false;
   bool effectiveUnderline = false;

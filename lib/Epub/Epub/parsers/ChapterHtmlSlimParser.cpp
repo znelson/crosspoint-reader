@@ -98,6 +98,36 @@ void ChapterHtmlSlimParser::updateEffectiveInlineStyle() {
   }
 }
 
+BlockStyle ChapterHtmlSlimParser::getAccumulatedBlockStyle() const {
+  if (blockStyleStackSize <= 0) return {};
+  // During overflow, return the deepest stored entry (best available approximation)
+  const int index = (blockStyleStackSize < MAX_BLOCK_STYLE_DEPTH) ? blockStyleStackSize - 1 : MAX_BLOCK_STYLE_DEPTH - 1;
+  // Bottom margins/padding are applied at element close in endElement, not here.
+  // This ensures they appear after the element's content (on the last child),
+  // not on the first child via the empty-block merge in startNewTextBlock.
+  return blockStyleStack[index].accumulated.withoutBottom();
+}
+
+void ChapterHtmlSlimParser::pushBlockStyle(const int depth, const BlockStyle& style) {
+  if (blockStyleStackSize < MAX_BLOCK_STYLE_DEPTH) {
+    const BlockStyle accumulated = (blockStyleStackSize > 0)
+                                       ? blockStyleStack[blockStyleStackSize - 1].accumulated.getCombinedBlockStyle(
+                                             style, BlockStyle::CombineAxis::Horizontal)
+                                       : style;
+    blockStyleStack[blockStyleStackSize] = {depth, accumulated};
+  } else {
+    LOG_ERR("EHP", "Block style stack overflow at depth %d", depth);
+  }
+  ++blockStyleStackSize;
+}
+
+void ChapterHtmlSlimParser::popBlockStyle(const int depth) {
+  if (blockStyleStackSize <= 0) return;
+  if (blockStyleStackSize > MAX_BLOCK_STYLE_DEPTH || blockStyleStack[blockStyleStackSize - 1].depth == depth) {
+    --blockStyleStackSize;
+  }
+}
+
 // flush the contents of partWordBuffer to currentTextBlock
 void ChapterHtmlSlimParser::flushPartWordBuffer() {
   // Determine font style from depth-based tracking and CSS effective style
@@ -130,10 +160,13 @@ void ChapterHtmlSlimParser::startNewTextBlock(const BlockStyle& blockStyle) {
   if (currentTextBlock) {
     // already have a text block running and it is empty - just reuse it
     if (currentTextBlock->isEmpty()) {
-      // Merge with existing block style to accumulate CSS styling from parent block elements.
-      // This handles cases like <div style="margin-bottom:2em"><h1>text</h1></div> where the
-      // div's margin should be preserved, even though it has no direct text content.
-      currentTextBlock->setBlockStyle(currentTextBlock->getBlockStyle().getCombinedBlockStyle(blockStyle));
+      // The stack accumulates horizontal margins and text properties from ancestors.
+      // Vertical margins are per-element and not inherited through the stack, but
+      // container elements (div, blockquote) deposit their vertical margins on the
+      // empty block when they open. Merge those into the new style so the first
+      // child in a container inherits the container's vertical spacing.
+      currentTextBlock->setBlockStyle(
+          currentTextBlock->getBlockStyle().getCombinedBlockStyle(blockStyle, BlockStyle::CombineAxis::Vertical));
 
       if (!pendingAnchorId.empty()) {
         anchorData.push_back({std::move(pendingAnchorId), static_cast<uint16_t>(completedPageCount)});
@@ -537,7 +570,8 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
     if (self->embeddedStyle && cssStyle.hasTextAlign()) {
       headerBlockStyle.alignment = cssStyle.textAlign;
     }
-    self->startNewTextBlock(headerBlockStyle);
+    self->pushBlockStyle(self->depth, headerBlockStyle);
+    self->startNewTextBlock(self->getAccumulatedBlockStyle());
     self->boldUntilDepth = std::min(self->boldUntilDepth, self->depth);
     self->updateEffectiveInlineStyle();
   } else if (matches(name, BLOCK_TAGS, NUM_BLOCK_TAGS)) {
@@ -546,10 +580,11 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
         // flush word preceding <br/> to currentTextBlock before calling startNewTextBlock
         self->flushPartWordBuffer();
       }
-      self->startNewTextBlock(self->currentTextBlock->getBlockStyle());
+      self->startNewTextBlock(self->getAccumulatedBlockStyle());
     } else {
       self->currentCssStyle = cssStyle;
-      self->startNewTextBlock(userAlignmentBlockStyle);
+      self->pushBlockStyle(self->depth, userAlignmentBlockStyle);
+      self->startNewTextBlock(self->getAccumulatedBlockStyle());
       self->updateEffectiveInlineStyle();
 
       if (strcmp(name, "li") == 0) {
@@ -927,19 +962,16 @@ void XMLCALL ChapterHtmlSlimParser::endElement(void* userData, const XML_Char* n
     self->currentCssStyle.reset();
     self->updateEffectiveInlineStyle();
 
-    // Reset alignment on empty text blocks to prevent stale alignment from bleeding
-    // into the next sibling element. This fixes issue #1026 where an empty <h1> (default
-    // Center) followed by an image-only <p> causes Center to persist through the chain
-    // of empty block reuse into subsequent text paragraphs.
-    // Margins/padding are preserved so parent element spacing still accumulates correctly.
-    if (self->currentTextBlock && self->currentTextBlock->isEmpty()) {
-      auto style = self->currentTextBlock->getBlockStyle();
-      style.textAlignDefined = false;
-      style.alignment = (self->paragraphAlignment == static_cast<uint8_t>(CssTextAlign::None))
-                            ? CssTextAlign::Justify
-                            : static_cast<CssTextAlign>(self->paragraphAlignment);
-      self->currentTextBlock->setBlockStyle(style);
+    // Apply the closing element's bottom margin/padding to the current text block.
+    // These are excluded from getAccumulatedBlockStyle() so they appear after the
+    // element's content rather than being merged into the first child.
+    if (self->currentTextBlock && self->blockStyleStackSize > 0 && self->blockStyleStackSize <= MAX_BLOCK_STYLE_DEPTH &&
+        self->blockStyleStack[self->blockStyleStackSize - 1].depth == self->depth) {
+      self->currentTextBlock->setBlockStyle(self->currentTextBlock->getBlockStyle().addBottom(
+          self->blockStyleStack[self->blockStyleStackSize - 1].accumulated));
     }
+
+    self->popBlockStyle(self->depth);
   }
 }
 
